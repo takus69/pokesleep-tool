@@ -122,7 +122,34 @@ const IngredientRankingView = React.memo(
 									shiny={result.iv.shiny}
 									size={40}
 								/>
-								<span>{t(`pokemons.${result.pokemon.name}`)}</span>
+								<StyledPokemonSummary>
+									<StyledPokemonName>
+										{t(`pokemons.${result.pokemon.name}`)}
+									</StyledPokemonName>
+									<StyledAppliedTraits>
+										<span>
+											<StyledTraitLabel>{t("nature")}:</StyledTraitLabel>
+											{result.iv.nature.upEffect === "No effect" ? (
+												t("nature effect.No effect")
+											) : (
+												<>
+													<StyledNatureUp>UP</StyledNatureUp>
+													{t(`nature effect.${result.iv.nature.upEffect}`)}{" "}
+													<StyledNatureDown>DOWN</StyledNatureDown>
+													{t(`nature effect.${result.iv.nature.downEffect}`)}
+												</>
+											)}
+										</span>
+										<span>
+											<StyledTraitLabel>{t("sub skills")}:</StyledTraitLabel>
+											{result.iv.activeSubSkills.length > 0
+												? result.iv.activeSubSkills
+														.map((subSkill) => t(`subskill.${subSkill.name}`))
+														.join(" / ")
+												: "-"}
+										</span>
+									</StyledAppliedTraits>
+								</StyledPokemonSummary>
 							</StyledPokemon>
 							<StyledIngredients>
 								{result.ingredientSlots.map((slot) => (
@@ -210,14 +237,55 @@ const StyledPokemon = styled("div")({
 	alignItems: "center",
 	gap: ".5rem",
 	minWidth: 0,
+	"@media (max-width: 600px)": {
+		gridColumn: "2 / 4",
+	},
+});
+
+const StyledPokemonSummary = styled("div")({
+	display: "flex",
+	flexDirection: "column",
+	gap: ".15rem",
+	minWidth: 0,
+});
+
+const StyledPokemonName = styled("span")({
+	overflow: "hidden",
+	textOverflow: "ellipsis",
+	whiteSpace: "nowrap",
+});
+
+const StyledAppliedTraits = styled("div")({
+	display: "flex",
+	flexDirection: "column",
+	gap: ".1rem",
+	minWidth: 0,
+	color: "#666",
+	fontSize: ".68rem",
+	lineHeight: 1.25,
 	"& > span": {
 		overflow: "hidden",
 		textOverflow: "ellipsis",
 		whiteSpace: "nowrap",
 	},
-	"@media (max-width: 600px)": {
-		gridColumn: "2 / 4",
-	},
+});
+
+const StyledTraitLabel = styled("strong")({
+	marginRight: ".25rem",
+	fontWeight: 500,
+});
+
+const StyledNatureUp = styled("strong")({
+	marginRight: ".2rem",
+	color: "#d32f2f",
+	fontSize: ".62rem",
+});
+
+const StyledNatureDown = styled("strong")({
+	marginRight: ".2rem",
+	marginLeft: ".5rem",
+	color: "#1976d2",
+	fontSize: ".62rem",
 });
 
 const StyledIngredients = styled("div")({
