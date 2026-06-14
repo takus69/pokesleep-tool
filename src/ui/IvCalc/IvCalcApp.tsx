@@ -9,6 +9,7 @@ import BoxExportDialog from "./Box/BoxExportDialog";
 import BoxImportDialog from "./Box/BoxImportDialog";
 import BoxItemDialog from "./Box/BoxItemDialog";
 import BoxView from "./Box/BoxView";
+import IngredientRankingView from "./IngredientRankingView";
 import IvForm from "./IvForm/IvForm";
 import { getInitialIvState, ivStateReducer } from "./IvState";
 import LowerTabHeader from "./LowerTabHeader";
@@ -90,10 +91,16 @@ const ResearchCalcApp = React.memo(() => {
 					background: "#f9f9f9",
 				}}
 			>
-				<StyledTabs value={state.tabIndex} onChange={onTabChange}>
+				<StyledTabs
+					value={state.tabIndex}
+					onChange={onTabChange}
+					variant="scrollable"
+					scrollButtons={false}
+				>
 					<StyledTab label={t("rp")} />
 					<StyledTab label={t("strength2")} />
 					<StyledTab label={t("rating")} />
+					<StyledTab label={t("ranking")} />
 				</StyledTabs>
 				{state.tabIndex === 0 && <RpView state={state} width={width} />}
 				{state.tabIndex === 1 && (
@@ -101,6 +108,12 @@ const ResearchCalcApp = React.memo(() => {
 				)}
 				{state.tabIndex === 2 && (
 					<RatingView pokemonIv={state.pokemonIv} width={width} />
+				)}
+				{state.tabIndex === 3 && (
+					<IngredientRankingView
+						baseIv={state.pokemonIv}
+						parameter={state.parameter}
+					/>
 				)}
 				<RateNotFixedPanel state={state} dispatch={dispatch} />
 
