@@ -128,6 +128,14 @@ const IngredientRankingView = React.memo(
 									</StyledPokemonName>
 									<StyledAppliedTraits>
 										<span>
+											<StyledTraitLabel>{t("sub skills")}:</StyledTraitLabel>
+											{result.iv.activeSubSkills.length > 0
+												? result.iv.activeSubSkills
+														.map((subSkill) => t(`subskill.${subSkill.name}`))
+														.join(" / ")
+												: "-"}
+										</span>
+										<span>
 											<StyledTraitLabel>{t("nature")}:</StyledTraitLabel>
 											{result.iv.nature.upEffect === "No effect" ? (
 												t("nature effect.No effect")
@@ -139,14 +147,6 @@ const IngredientRankingView = React.memo(
 													{t(`nature effect.${result.iv.nature.downEffect}`)}
 												</>
 											)}
-										</span>
-										<span>
-											<StyledTraitLabel>{t("sub skills")}:</StyledTraitLabel>
-											{result.iv.activeSubSkills.length > 0
-												? result.iv.activeSubSkills
-														.map((subSkill) => t(`subskill.${subSkill.name}`))
-														.join(" / ")
-												: "-"}
 										</span>
 									</StyledAppliedTraits>
 								</StyledPokemonSummary>
