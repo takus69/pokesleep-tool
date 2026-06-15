@@ -1,7 +1,10 @@
 name: Deploy
 
 on:
-  # pushed to master
+  # manually deploy the selected branch
+  workflow_dispatch:
+
+  # pushed to main
   push:
     branches:
       - main
@@ -15,7 +18,10 @@ on:
 
 jobs:
   build:
-    if: github.repository_owner == 'nitoyon'
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'push' ||
+      (github.repository_owner == 'nitoyon' && github.event_name == 'pull_request')
     runs-on: ubuntu-latest
     permissions:
       contents: write
