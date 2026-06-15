@@ -110,10 +110,7 @@ const ResearchCalcApp = React.memo(() => {
 					<RatingView pokemonIv={state.pokemonIv} width={width} />
 				)}
 				{state.tabIndex === 3 && (
-					<IngredientRankingView
-						baseIv={state.pokemonIv}
-						parameter={state.parameter}
-					/>
+					<IngredientRankingView parameter={state.parameter} />
 				)}
 				<RateNotFixedPanel state={state} dispatch={dispatch} />
 

@@ -1,4 +1,5 @@
 import {
+	CircularProgress,
 	FormControl,
 	InputLabel,
 	MenuItem,
@@ -9,35 +10,57 @@ import { styled } from "@mui/system";
 import React from "react";
 import { useTranslation } from "react-i18next";
 import { type IngredientName, IngredientNames } from "../../data/pokemons";
-import { calculateIngredientRanking } from "../../util/IngredientRanking";
-import type PokemonIv from "../../util/PokemonIv";
+import {
+	calculateIngredientRankingAsync,
+	type IngredientRankingEntry,
+} from "../../util/IngredientRanking";
 import type { StrengthParameter } from "../../util/PokemonStrength";
 import IngredientCountIcon from "./IngredientCountIcon";
 import IngredientIcon from "./IngredientIcon";
 import PokemonIcon from "./PokemonIcon";
 
 const IngredientRankingView = React.memo(
-	({
-		baseIv,
-		parameter,
-	}: {
-		baseIv: PokemonIv;
-		parameter: StrengthParameter;
-	}) => {
+	({ parameter }: { parameter: StrengthParameter }) => {
 		const { i18n, t } = useTranslation();
 		const [ingredient, setIngredient] = React.useState<IngredientName>("apple");
 		const [level, setLevel] = React.useState(60);
+		const [ranking, setRanking] = React.useState<IngredientRankingEntry[]>([]);
+		const [calculating, setCalculating] = React.useState(true);
 
-		const ranking = React.useMemo(
-			() =>
-				calculateIngredientRanking({
-					ingredient,
-					level,
-					baseIv,
-					parameter,
-				}),
-			[baseIv, ingredient, level, parameter],
-		);
+		React.useEffect(() => {
+			const controller = new AbortController();
+			let active = true;
+			setCalculating(true);
+
+			calculateIngredientRankingAsync({
+				ingredient,
+				level,
+				parameter,
+				limit: 100,
+				signal: controller.signal,
+			})
+				.then((result) => {
+					if (active) {
+						setRanking(result);
+						setCalculating(false);
+					}
+				})
+				.catch((error: unknown) => {
+					if (error instanceof Error && error.name === "AbortError") {
+						return;
+					}
+					console.error(error);
+					if (active) {
+						setRanking([]);
+						setCalculating(false);
+					}
+				});
+
+			return () => {
+				active = false;
+				controller.abort();
+			};
+		}, [ingredient, level, parameter]);
 
 		const onIngredientChange = React.useCallback(
 			(event: { target: { value: unknown } }) => {
@@ -110,59 +133,67 @@ const IngredientRankingView = React.memo(
 						<span>{t("ingredient configuration")}</span>
 						<span>{t("expected ingredient count")}</span>
 					</StyledHeader>
-					{ranking.length === 0 && (
+					{calculating && (
+						<StyledLoading>
+							<CircularProgress size={30} />
+						</StyledLoading>
+					)}
+					{!calculating && ranking.length === 0 && (
 						<StyledEmpty>{t("no ranking results")}</StyledEmpty>
 					)}
-					{ranking.map((result, index) => (
-						<StyledRow key={`${result.pokemon.name}-${result.ingredientKey}`}>
-							<strong>{index + 1}</strong>
-							<StyledPokemon>
-								<PokemonIcon
-									idForm={result.iv.idForm}
-									shiny={result.iv.shiny}
-									size={40}
-								/>
-								<StyledPokemonSummary>
-									<StyledPokemonName>
-										{t(`pokemons.${result.pokemon.name}`)}
-									</StyledPokemonName>
-									<StyledAppliedTraits>
-										<span>
-											<StyledTraitLabel>{t("sub skills")}:</StyledTraitLabel>
-											{result.iv.activeSubSkills.length > 0
-												? result.iv.activeSubSkills
-														.map((subSkill) => t(`subskill.${subSkill.name}`))
-														.join(" / ")
-												: "-"}
-										</span>
-										<span>
-											<StyledTraitLabel>{t("nature")}:</StyledTraitLabel>
-											{result.iv.nature.upEffect === "No effect" ? (
-												t("nature effect.No effect")
-											) : (
-												<>
-													<StyledNatureUp>UP</StyledNatureUp>
-													{t(`nature effect.${result.iv.nature.upEffect}`)}{" "}
-													<StyledNatureDown>DOWN</StyledNatureDown>
-													{t(`nature effect.${result.iv.nature.downEffect}`)}
-												</>
-											)}
-										</span>
-									</StyledAppliedTraits>
-								</StyledPokemonSummary>
-							</StyledPokemon>
-							<StyledIngredients>
-								{result.ingredientSlots.map((slot) => (
-									<IngredientCountIcon
-										key={slot.index}
-										name={slot.name}
-										count={slot.count}
+					{!calculating &&
+						ranking.map((result, index) => (
+							<StyledRow
+								key={`${result.pokemon.id}-${result.iv.form}-${result.ordinal}-${result.natureOrder}-${result.subSkillOrder}`}
+							>
+								<strong>{index + 1}</strong>
+								<StyledPokemon>
+									<PokemonIcon
+										idForm={result.iv.idForm}
+										shiny={result.iv.shiny}
+										size={40}
 									/>
-								))}
-							</StyledIngredients>
-							<StyledCount>{countFormatter.format(result.count)}</StyledCount>
-						</StyledRow>
-					))}
+									<StyledPokemonSummary>
+										<StyledPokemonName>
+											{t(`pokemons.${result.pokemon.name}`)}
+										</StyledPokemonName>
+										<StyledAppliedTraits>
+											<span>
+												<StyledTraitLabel>{t("sub skills")}:</StyledTraitLabel>
+												{result.iv.activeSubSkills.length > 0
+													? result.iv.activeSubSkills
+															.map((subSkill) => t(`subskill.${subSkill.name}`))
+															.join(" / ")
+													: "-"}
+											</span>
+											<span>
+												<StyledTraitLabel>{t("nature")}:</StyledTraitLabel>
+												{result.iv.nature.upEffect === "No effect" ? (
+													t("nature effect.No effect")
+												) : (
+													<>
+														<StyledNatureUp>UP</StyledNatureUp>
+														{t(`nature effect.${result.iv.nature.upEffect}`)}{" "}
+														<StyledNatureDown>DOWN</StyledNatureDown>
+														{t(`nature effect.${result.iv.nature.downEffect}`)}
+													</>
+												)}
+											</span>
+										</StyledAppliedTraits>
+									</StyledPokemonSummary>
+								</StyledPokemon>
+								<StyledIngredients>
+									{result.ingredientSlots.map((slot) => (
+										<IngredientCountIcon
+											key={slot.index}
+											name={slot.name}
+											count={slot.count}
+										/>
+									))}
+								</StyledIngredients>
+								<StyledCount>{countFormatter.format(result.count)}</StyledCount>
+							</StyledRow>
+						))}
 				</StyledResults>
 			</StyledRanking>
 		);
@@ -310,6 +341,12 @@ const StyledEmpty = styled("p")({
 	margin: "1rem .5rem",
 	color: "#666",
 	fontSize: ".9rem",
+});
+
+const StyledLoading = styled("div")({
+	display: "flex",
+	justifyContent: "center",
+	padding: "1.5rem",
 });
 
 export default IngredientRankingView;
