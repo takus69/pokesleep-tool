@@ -116,7 +116,9 @@ const LowerTabHeader = React.memo(
 				<StyledTabs value={tabIndex} onChange={onTabChange}>
 					<StyledTab label={t("pokemon")} />
 					<StyledTab label={t("box")} ref={boxTabRef} />
-					{upperTabIndex === 1 && <StyledTab label={t("parameter")} />}
+					{(upperTabIndex === 1 || upperTabIndex === 3) && (
+						<StyledTab label={t("parameter")} />
+					)}
 				</StyledTabs>
 
 				<Menu

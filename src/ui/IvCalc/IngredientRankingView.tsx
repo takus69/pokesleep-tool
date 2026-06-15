@@ -1,12 +1,18 @@
 import {
 	Button,
 	CircularProgress,
+	Dialog,
+	DialogContent,
+	DialogTitle,
 	FormControl,
 	FormLabel,
 	InputLabel,
 	MenuItem,
+	Pagination,
 	Select,
 	TextField,
+	ToggleButton,
+	ToggleButtonGroup,
 } from "@mui/material";
 import { styled } from "@mui/system";
 import React from "react";
@@ -17,25 +23,52 @@ import pokemons, {
 } from "../../data/pokemons";
 import {
 	calculateIngredientRankingAsync,
+	createIngredientRankingBaselineIv,
+	evaluatePokemonIngredient,
+	groupIngredientRankingEntries,
 	type IngredientRankingEntry,
+	mergeIngredientRankingComparison,
 } from "../../util/IngredientRanking";
 import PokemonIv from "../../util/PokemonIv";
-import type { StrengthParameter } from "../../util/PokemonStrength";
 import IngredientCountIcon from "./IngredientCountIcon";
 import IngredientIcon from "./IngredientIcon";
+import IvForm from "./IvForm/IvForm";
 import PokemonSelectDialog from "./IvForm/PokemonSelectDialog";
 import type { PokemonOption } from "./IvForm/PokemonTextField";
+import type IvState from "./IvState";
+import type { IvAction } from "./IvState";
 import PokemonIcon from "./PokemonIcon";
+import StrengthParameterSummary from "./Strength/StrengthParameterSummary";
+
+const pageSize = 100;
+
+type ComparisonMode = "baseline" | "manual" | "registered";
 
 const IngredientRankingView = React.memo(
-	({ parameter }: { parameter: StrengthParameter }) => {
+	({
+		state,
+		dispatch,
+	}: {
+		state: IvState;
+		dispatch: React.Dispatch<IvAction>;
+	}) => {
 		const { i18n, t } = useTranslation();
+		const parameter = state.parameter;
 		const [pokemonName, setPokemonName] = React.useState("Skeledirge");
 		const [ingredient, setIngredient] = React.useState<IngredientName>("apple");
 		const [level, setLevel] = React.useState(60);
 		const [ranking, setRanking] = React.useState<IngredientRankingEntry[]>([]);
 		const [calculating, setCalculating] = React.useState(true);
+		const [page, setPage] = React.useState(1);
 		const [pokemonDialogOpen, setPokemonDialogOpen] = React.useState(false);
+		const [comparisonMode, setComparisonMode] =
+			React.useState<ComparisonMode>("baseline");
+		const [manualIv, setManualIv] = React.useState(
+			() => new PokemonIv({ pokemonName: "Skeledirge", level: 60 }),
+		);
+		const [manualDialogOpen, setManualDialogOpen] = React.useState(false);
+		const [registeredId, setRegisteredId] = React.useState<number | "">("");
+		const resetComparisonRef = React.useRef(true);
 
 		const pokemonOptions = React.useMemo<PokemonOption[]>(
 			() =>
@@ -64,13 +97,13 @@ const IngredientRankingView = React.memo(
 			const controller = new AbortController();
 			let active = true;
 			setCalculating(true);
+			setPage(1);
 
 			calculateIngredientRankingAsync({
 				pokemonName,
 				ingredient,
 				level,
 				parameter,
-				limit: 100,
 				signal: controller.signal,
 			})
 				.then((result) => {
@@ -102,13 +135,22 @@ const IngredientRankingView = React.memo(
 		const onPokemonDialogClose = React.useCallback(() => {
 			setPokemonDialogOpen(false);
 		}, []);
-		const onPokemonChange = React.useCallback((value: PokemonOption) => {
-			setPokemonName(value.name);
-		}, []);
+		const onPokemonChange = React.useCallback(
+			(value: PokemonOption) => {
+				resetComparisonRef.current = true;
+				setComparisonMode("baseline");
+				setRegisteredId("");
+				setManualIv(new PokemonIv({ pokemonName: value.name, level }));
+				setPokemonName(value.name);
+				setPage(1);
+			},
+			[level],
+		);
 
 		const onIngredientChange = React.useCallback(
 			(event: { target: { value: unknown } }) => {
 				setIngredient(event.target.value as IngredientName);
+				setPage(1);
 			},
 			[],
 		);
@@ -117,10 +159,47 @@ const IngredientRankingView = React.memo(
 				const value = Number(event.target.value);
 				if (Number.isInteger(value) && value >= 1 && value <= 100) {
 					setLevel(value);
+					setPage(1);
 				}
 			},
 			[],
 		);
+		const onPageChange = React.useCallback(
+			(_event: React.ChangeEvent<unknown>, value: number) => {
+				setPage(value);
+			},
+			[],
+		);
+		const onComparisonModeChange = React.useCallback(
+			(_event: React.MouseEvent<HTMLElement>, value: ComparisonMode | null) => {
+				if (value === null) {
+					return;
+				}
+				if (
+					value === "registered" &&
+					registeredId === "" &&
+					state.box.items[0] !== undefined
+				) {
+					setRegisteredId(state.box.items[0].id);
+				}
+				setComparisonMode(value);
+				setPage(1);
+			},
+			[registeredId, state.box.items],
+		);
+		const onRegisteredChange = React.useCallback(
+			(event: { target: { value: unknown } }) => {
+				setRegisteredId(Number(event.target.value));
+				setPage(1);
+			},
+			[],
+		);
+		const onManualEditClick = React.useCallback(() => {
+			setManualDialogOpen(true);
+		}, []);
+		const onManualDialogClose = React.useCallback(() => {
+			setManualDialogOpen(false);
+		}, []);
 		const countFormatter = React.useMemo(
 			() =>
 				new Intl.NumberFormat(i18n.language, {
@@ -138,8 +217,107 @@ const IngredientRankingView = React.memo(
 			[t],
 		);
 
+		const baselineIv = React.useMemo(
+			() =>
+				createIngredientRankingBaselineIv({
+					pokemonName,
+					level,
+					ingredient,
+					parameter,
+				}),
+			[ingredient, level, parameter, pokemonName],
+		);
+		React.useEffect(() => {
+			if (resetComparisonRef.current && baselineIv !== null) {
+				setManualIv(baselineIv);
+				resetComparisonRef.current = false;
+			}
+		}, [baselineIv]);
+		const registeredItem =
+			registeredId === ""
+				? undefined
+				: state.box.items.find((item) => item.id === registeredId);
+		const comparisonIv =
+			comparisonMode === "baseline"
+				? baselineIv
+				: comparisonMode === "manual"
+					? manualIv
+					: (registeredItem?.iv ?? null);
+		const comparisonName =
+			comparisonMode === "registered" && registeredItem !== undefined
+				? registeredItem.filledNickname(t)
+				: comparisonIv === null
+					? ""
+					: t(`pokemons.${comparisonIv.pokemonName}`);
+		const comparisonEvaluation = React.useMemo(
+			() =>
+				calculating || comparisonIv === null
+					? { status: "uncalculable" as const }
+					: evaluatePokemonIngredient(comparisonIv, ingredient, parameter),
+			[calculating, comparisonIv, ingredient, parameter],
+		);
+		const rankingGroups = React.useMemo(
+			() => groupIngredientRankingEntries(ranking),
+			[ranking],
+		);
+		const comparison = React.useMemo(
+			() =>
+				mergeIngredientRankingComparison(
+					rankingGroups,
+					comparisonEvaluation,
+					pageSize,
+				),
+			[comparisonEvaluation, rankingGroups],
+		);
+		const comparisonCount =
+			comparison.evaluation.status === "uncalculable"
+				? null
+				: comparison.evaluation.count;
+		const comparisonRank = comparison.rank;
+		const theoreticalPageCount = Math.ceil(rankingGroups.length / pageSize);
+		const pageCount = Math.max(
+			1,
+			theoreticalPageCount,
+			comparison.page === null ? 0 : comparison.page + 1,
+		);
+		const clampedPage = Math.min(Math.max(page, 1), pageCount);
+		const pageStart = (clampedPage - 1) * pageSize;
+		const pageEnd = Math.min(pageStart + pageSize, rankingGroups.length);
+		const pageGroups = rankingGroups.slice(pageStart, pageEnd);
+		const comparisonGroupIndex = comparison.groupIndex;
+		const comparisonOnPage =
+			comparison.page === clampedPage - 1 && comparisonGroupIndex !== null;
+
+		React.useEffect(() => {
+			setPage((current) => Math.min(Math.max(current, 1), pageCount));
+		}, [pageCount]);
+
+		const onGoToRankClick = React.useCallback(() => {
+			if (comparison.page !== null) {
+				setPage(comparison.page + 1);
+			}
+		}, [comparison.page]);
+		const onDetailedSettingsClick = React.useCallback(() => {
+			dispatch({ type: "changeLowerTab", payload: { index: 2 } });
+		}, [dispatch]);
+
 		return (
 			<StyledRanking>
+				<StyledConditionSummary>
+					<StyledConditionHeader>
+						<strong>{t("ranking common settings")}</strong>
+						<Button size="small" onClick={onDetailedSettingsClick}>
+							{t("detailed settings")}
+						</Button>
+					</StyledConditionHeader>
+					<StrengthParameterSummary state={state} dispatch={dispatch} />
+					<StyledSleepScore>
+						{t("sleep score")}: {parameter.sleepScore}
+					</StyledSleepScore>
+					<StyledRankingLevelNote>
+						{t("ranking uses selected levels")}
+					</StyledRankingLevelNote>
+				</StyledConditionSummary>
 				<StyledControls>
 					<FormControl required>
 						<StyledPokemonLabel>{t("pokemon")}</StyledPokemonLabel>
@@ -193,6 +371,101 @@ const IngredientRankingView = React.memo(
 					onChange={onPokemonChange}
 				/>
 
+				<StyledComparisonCard>
+					<StyledComparisonHeader>
+						<strong>{t("comparison target")}</strong>
+						<ToggleButtonGroup
+							exclusive
+							size="small"
+							value={comparisonMode}
+							onChange={onComparisonModeChange}
+						>
+							<ToggleButton value="baseline">
+								{t("comparison baseline")}
+							</ToggleButton>
+							<ToggleButton value="manual">
+								{t("comparison manual")}
+							</ToggleButton>
+							<ToggleButton value="registered">
+								{t("comparison registered")}
+							</ToggleButton>
+						</ToggleButtonGroup>
+					</StyledComparisonHeader>
+					{comparisonMode === "registered" && (
+						<FormControl variant="standard" size="small">
+							<InputLabel>{t("registered pokemon")}</InputLabel>
+							<Select
+								value={registeredId}
+								onChange={onRegisteredChange}
+								label={t("registered pokemon")}
+							>
+								{state.box.items.map((item) => (
+									<MenuItem key={item.id} value={item.id}>
+										<PokemonIcon
+											idForm={item.iv.idForm}
+											shiny={item.iv.shiny}
+											size={24}
+										/>
+										<span>{item.filledNickname(t)}</span>
+									</MenuItem>
+								))}
+							</Select>
+						</FormControl>
+					)}
+					{comparisonMode === "manual" && (
+						<Button size="small" onClick={onManualEditClick}>
+							{t("edit comparison target")}
+						</Button>
+					)}
+					{comparisonIv !== null ? (
+						<ComparisonSummary
+							iv={comparisonIv}
+							name={comparisonName}
+							count={comparisonCount}
+							rank={comparisonRank}
+							countFormatter={countFormatter}
+							onGoToRankClick={onGoToRankClick}
+						/>
+					) : (
+						<StyledUnavailable>{t("comparison unavailable")}</StyledUnavailable>
+					)}
+				</StyledComparisonCard>
+				<Dialog
+					fullWidth
+					maxWidth="sm"
+					open={manualDialogOpen}
+					onClose={onManualDialogClose}
+				>
+					<DialogTitle>{t("edit comparison target")}</DialogTitle>
+					<DialogContent>
+						<IvForm
+							parameter={parameter}
+							pokemonIv={manualIv}
+							dispatch={dispatch}
+							onChange={(value) => {
+								setManualIv(value);
+								setPage(1);
+							}}
+						/>
+					</DialogContent>
+				</Dialog>
+
+				<StyledPaginationSummary>
+					<span>
+						{t("ranking result range", {
+							start: pageGroups.length === 0 ? 0 : pageStart + 1,
+							end: pageGroups.length === 0 ? 0 : pageEnd,
+							total: ranking.length,
+							groups: rankingGroups.length,
+						})}
+					</span>
+					<Pagination
+						count={pageCount}
+						page={clampedPage}
+						size="small"
+						onChange={onPageChange}
+					/>
+				</StyledPaginationSummary>
 				<StyledResults>
 					<StyledHeader>
 						<span>{t("rank")}</span>
@@ -209,66 +482,270 @@ const IngredientRankingView = React.memo(
 						<StyledEmpty>{t("no ranking results")}</StyledEmpty>
 					)}
 					{!calculating &&
-						ranking.map((result, index) => (
-							<StyledRow
-								key={`${result.pokemon.id}-${result.iv.form}-${result.ordinal}-${result.natureOrder}-${result.subSkillOrder}`}
-							>
-								<strong>{index + 1}</strong>
-								<StyledPokemon>
-									<PokemonIcon
-										idForm={result.iv.idForm}
-										shiny={result.iv.shiny}
-										size={40}
+						pageGroups.flatMap((group, index) => {
+							const rank = pageStart + index + 1;
+							const rows: React.ReactNode[] = [];
+							if (
+								comparisonOnPage &&
+								comparisonGroupIndex === pageStart + index &&
+								comparisonIv !== null
+							) {
+								rows.push(
+									<ComparisonRow
+										key={`comparison-row-${comparisonRank}`}
+										iv={comparisonIv}
+										name={comparisonName}
+										count={comparisonCount}
+										rank={comparisonRank}
+										countFormatter={countFormatter}
+									/>,
+								);
+							}
+							rows.push(
+								...group.entries.map((result) => (
+									<RankingRow
+										key={`${result.pokemon.id}-${result.iv.form}-${result.ordinal}-${result.natureOrder}-${result.subSkillOrder}`}
+										result={result}
+										rank={rank}
+										countFormatter={countFormatter}
 									/>
-									<StyledPokemonSummary>
-										<StyledPokemonName>
-											{t(`pokemons.${result.pokemon.name}`)}
-										</StyledPokemonName>
-										<StyledAppliedTraits>
-											<span>
-												<StyledTraitLabel>{t("sub skills")}:</StyledTraitLabel>
-												{result.iv.activeSubSkills.length > 0
-													? result.iv.activeSubSkills
-															.map((subSkill) => t(`subskill.${subSkill.name}`))
-															.join(" / ")
-													: "-"}
-											</span>
-											<span>
-												<StyledTraitLabel>{t("nature")}:</StyledTraitLabel>
-												{result.iv.nature.upEffect === "No effect" ? (
-													t("nature effect.No effect")
-												) : (
-													<>
-														<StyledNatureUp>UP</StyledNatureUp>
-														{t(`nature effect.${result.iv.nature.upEffect}`)}{" "}
-														<StyledNatureDown>DOWN</StyledNatureDown>
-														{t(`nature effect.${result.iv.nature.downEffect}`)}
-													</>
-												)}
-											</span>
-										</StyledAppliedTraits>
-									</StyledPokemonSummary>
-								</StyledPokemon>
-								<StyledIngredients>
-									{result.ingredientSlots.map((slot) => (
-										<IngredientCountIcon
-											key={slot.index}
-											name={slot.name}
-											count={slot.count}
-										/>
-									))}
-								</StyledIngredients>
-								<StyledCount>{countFormatter.format(result.count)}</StyledCount>
-							</StyledRow>
-						))}
+								)),
+							);
+							return rows;
+						})}
+					{!calculating &&
+						comparisonOnPage &&
+						comparisonGroupIndex === pageEnd &&
+						comparisonIv !== null && (
+							<ComparisonRow
+								iv={comparisonIv}
+								name={comparisonName}
+								count={comparisonCount}
+								rank={comparisonRank}
+								countFormatter={countFormatter}
+							/>
+						)}
 				</StyledResults>
+				<StyledPaginationSummary>
+					<span />
+					<Pagination
+						count={pageCount}
+						page={clampedPage}
+						size="small"
+						onChange={onPageChange}
+					/>
+				</StyledPaginationSummary>
 			</StyledRanking>
 		);
 	},
 );
 
+const RankingRow = React.memo(
+	({
+		result,
+		rank,
+		countFormatter,
+	}: {
+		result: IngredientRankingEntry;
+		rank: number;
+		countFormatter: Intl.NumberFormat;
+	}) => (
+		<StyledRow>
+			<strong>{rank}</strong>
+			<PokemonSummary
+				iv={result.iv}
+				nameKey={`pokemons.${result.pokemon.name}`}
+			/>
+			<IngredientConfiguration iv={result.iv} />
+			<StyledCount>{countFormatter.format(result.count)}</StyledCount>
+		</StyledRow>
+	),
+);
+
+const ComparisonRow = React.memo(
+	({
+		iv,
+		name,
+		count,
+		rank,
+		countFormatter,
+	}: {
+		iv: PokemonIv;
+		name: string;
+		count: number | null;
+		rank: number | null;
+		countFormatter: Intl.NumberFormat;
+	}) => {
+		const { t } = useTranslation();
+		return (
+			<StyledRow className="comparison">
+				<strong>{rank ?? "-"}</strong>
+				<PokemonSummary iv={iv} name={name} />
+				<IngredientConfiguration iv={iv} />
+				<StyledCount>
+					{count === null
+						? t("comparison unavailable")
+						: countFormatter.format(count)}
+				</StyledCount>
+			</StyledRow>
+		);
+	},
+);
+
+const PokemonSummary = React.memo(
+	({
+		iv,
+		name,
+		nameKey,
+	}: {
+		iv: PokemonIv;
+		name?: string;
+		nameKey?: string;
+	}) => {
+		const { t } = useTranslation();
+		return (
+			<StyledPokemon>
+				<PokemonIcon idForm={iv.idForm} shiny={iv.shiny} size={40} />
+				<StyledPokemonSummary>
+					<StyledPokemonName>
+						{name ?? (nameKey === undefined ? "" : t(nameKey))}
+					</StyledPokemonName>
+					<AppliedTraits iv={iv} />
+				</StyledPokemonSummary>
+			</StyledPokemon>
+		);
+	},
+);
+
+const AppliedTraits = React.memo(({ iv }: { iv: PokemonIv }) => {
+	const { t } = useTranslation();
+	return (
+		<StyledAppliedTraits>
+			<span>
+				<StyledTraitLabel>{t("sub skills")}:</StyledTraitLabel>
+				{iv.activeSubSkills.length > 0
+					? iv.activeSubSkills
+							.map((subSkill) => t(`subskill.${subSkill.name}`))
+							.join(" / ")
+					: "-"}
+			</span>
+			<span>
+				<StyledTraitLabel>{t("nature")}:</StyledTraitLabel>
+				{iv.nature.upEffect === "No effect" ? (
+					t("nature effect.No effect")
+				) : (
+					<>
+						<StyledNatureUp>UP</StyledNatureUp>
+						{t(`nature effect.${iv.nature.upEffect}`)}{" "}
+						<StyledNatureDown>DOWN</StyledNatureDown>
+						{t(`nature effect.${iv.nature.downEffect}`)}
+					</>
+				)}
+			</span>
+		</StyledAppliedTraits>
+	);
+});
+
+const IngredientConfiguration = React.memo(({ iv }: { iv: PokemonIv }) => (
+	<StyledIngredients>
+		{getIngredientSlots(iv).map((slot) => (
+			<IngredientCountIcon
+				key={slot.index}
+				name={slot.name}
+				count={slot.count}
+			/>
+		))}
+	</StyledIngredients>
+));
+
+const ComparisonSummary = React.memo(
+	({
+		iv,
+		name,
+		count,
+		rank,
+		countFormatter,
+		onGoToRankClick,
+	}: {
+		iv: PokemonIv;
+		name: string;
+		count: number | null;
+		rank: number | null;
+		countFormatter: Intl.NumberFormat;
+		onGoToRankClick: () => void;
+	}) => {
+		const { t } = useTranslation();
+		return (
+			<StyledComparisonSummary>
+				<PokemonSummary iv={iv} name={name} />
+				<div>
+					<strong>{t("level")}:</strong> {iv.level}
+				</div>
+				<IngredientConfiguration iv={iv} />
+				<div>
+					<strong>{t("comparison expected count")}:</strong>{" "}
+					{count === null
+						? t("comparison unavailable")
+						: countFormatter.format(count)}
+				</div>
+				<div>
+					<strong>{t("equivalent rank")}:</strong>{" "}
+					{rank === null ? t("comparison unavailable") : rank}
+				</div>
+				<Button size="small" disabled={rank === null} onClick={onGoToRankClick}>
+					{t("go to comparison rank")}
+				</Button>
+			</StyledComparisonSummary>
+		);
+	},
+);
+
+function getIngredientSlots(iv: PokemonIv) {
+	try {
+		return [iv.ingredient1, iv.ingredient2, iv.ingredient3];
+	} catch {
+		return [iv.ingredient1, iv.ingredient2];
+	}
+}
+
 const StyledRanking = styled("section")({
 	paddingBottom: ".4rem",
+});
+
+const StyledConditionSummary = styled("section")({
+	marginBottom: ".8rem",
+	"& .edit": {
+		display: "none",
+	},
+	"& .level": {
+		display: "none",
+	},
+});
+
+const StyledConditionHeader = styled("div")({
+	display: "flex",
+	alignItems: "center",
+	justifyContent: "space-between",
+	marginBottom: ".2rem",
+	fontSize: ".8rem",
+	"& > button": {
+		padding: 0,
+		fontSize: ".75rem",
+		textTransform: "none",
+	},
+});
+
+const StyledSleepScore = styled("div")({
+	marginTop: ".25rem",
+	paddingLeft: ".6rem",
+	color: "#555",
+	fontSize: ".75rem",
+});
+
+const StyledRankingLevelNote = styled("div")({
+	paddingLeft: ".6rem",
+	color: "#555",
+	fontSize: ".75rem",
 });
 
 const StyledControls = styled("div")({
@@ -286,6 +763,74 @@ const StyledControls = styled("div")({
 		"& > div:first-of-type": {
 			gridColumn: "1 / -1",
 		},
+	},
+});
+
+const StyledComparisonCard = styled("section")({
+	display: "flex",
+	flexDirection: "column",
+	gap: ".6rem",
+	marginBottom: ".8rem",
+	padding: ".6rem",
+	border: "1px solid #ccd5dd",
+	borderRadius: ".6rem",
+	background: "#f8fafc",
+	"& .MuiSelect-select": {
+		display: "flex",
+		alignItems: "center",
+		gap: ".4rem",
+	},
+});
+
+const StyledComparisonHeader = styled("div")({
+	display: "flex",
+	alignItems: "center",
+	justifyContent: "space-between",
+	gap: ".5rem",
+	"& .MuiToggleButton-root": {
+		padding: ".2rem .5rem",
+		fontSize: ".72rem",
+		textTransform: "none",
+	},
+	"@media (max-width: 600px)": {
+		alignItems: "stretch",
+		flexDirection: "column",
+	},
+});
+
+const StyledComparisonSummary = styled("div")({
+	display: "grid",
+	gridTemplateColumns: "minmax(10rem, 1.4fr) auto auto auto auto",
+	gap: ".5rem 1rem",
+	alignItems: "center",
+	fontSize: ".78rem",
+	"& > button": {
+		whiteSpace: "nowrap",
+	},
+	"@media (max-width: 700px)": {
+		gridTemplateColumns: "minmax(0, 1fr) auto",
+		"& > div:first-of-type": {
+			gridColumn: "1 / -1",
+		},
+	},
+});
+
+const StyledUnavailable = styled("div")({
+	color: "#666",
+	fontSize: ".8rem",
+});
+
+const StyledPaginationSummary = styled("div")({
+	display: "flex",
+	alignItems: "center",
+	justifyContent: "space-between",
+	gap: ".5rem",
+	margin: ".35rem 0",
+	color: "#666",
+	fontSize: ".75rem",
+	"@media (max-width: 600px)": {
+		alignItems: "flex-start",
+		flexDirection: "column",
 	},
 });
 
@@ -349,6 +894,11 @@ const StyledRow = styled("div")({
 	minHeight: "52px",
 	padding: ".35rem .5rem",
 	borderBottom: "1px solid #eee",
+	"&.comparison": {
+		background: "#fff6d6",
+		borderTop: "2px solid #e0a800",
+		borderBottom: "2px solid #e0a800",
+	},
 	"& > strong": {
 		textAlign: "center",
 	},

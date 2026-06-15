@@ -63,6 +63,45 @@ export interface IngredientRankingOptions {
 	signal?: AbortSignal;
 }
 
+export interface IngredientRankingBaselineOptions {
+	pokemonName: string;
+	level: IngredientRankingLevel;
+	ingredient: IngredientName;
+	parameter: StrengthParameter;
+	strengthCalculator?: IngredientRankingStrengthCalculator;
+}
+
+export type IngredientEvaluation =
+	| { status: "positive"; count: number }
+	| { status: "zero"; count: 0 }
+	| { status: "uncalculable" };
+
+export interface IngredientRankingCountGroup {
+	count: number;
+	entries: readonly IngredientRankingEntry[];
+}
+
+export interface IngredientRankingComparisonGroup
+	extends IngredientRankingCountGroup {
+	includesComparison: boolean;
+}
+
+export type IngredientRankingComparison =
+	| {
+			evaluation: Exclude<IngredientEvaluation, { status: "uncalculable" }>;
+			rank: number;
+			groupIndex: number;
+			page: number;
+			groups: IngredientRankingComparisonGroup[];
+	  }
+	| {
+			evaluation: Extract<IngredientEvaluation, { status: "uncalculable" }>;
+			rank: null;
+			groupIndex: null;
+			page: null;
+			groups: IngredientRankingComparisonGroup[];
+	  };
+
 const unknownIngredientPattern = /^unknown(?:[123])?$/;
 const asyncSelectionYieldInterval = 32;
 const asyncCombinationYieldInterval = 64;
@@ -141,31 +180,144 @@ export function calculateIngredientCount(
 	parameter: StrengthParameter,
 	strengthCalculator: IngredientRankingStrengthCalculator = defaultStrengthCalculator,
 ): IngredientCountMetric | null {
-	const unlockedSlots = getUnlockedIngredientSlots(candidate.iv);
+	const evaluation = evaluatePokemonIngredient(
+		candidate.iv,
+		ingredient,
+		parameter,
+		strengthCalculator,
+	);
+	return evaluation.status === "positive" ? { count: evaluation.count } : null;
+}
+
+/**
+ * Evaluate one Pokemon using its own level and helper-produced ingredients.
+ */
+export function evaluatePokemonIngredient(
+	iv: PokemonIv,
+	ingredient: IngredientName,
+	parameter: StrengthParameter,
+	strengthCalculator: IngredientRankingStrengthCalculator = defaultStrengthCalculator,
+): IngredientEvaluation {
+	const unlockedSlots = getUnlockedIngredientSlots(iv);
 	if (
 		isUnknownIngredient(ingredient) ||
 		unlockedSlots === null ||
-		!isCandidateCalculable(candidate, parameter, unlockedSlots) ||
-		!unlockedSlots.some((slot) => slot.name === ingredient)
+		!isIvCalculable(iv, parameter, unlockedSlots)
 	) {
-		return null;
+		return { status: "uncalculable" };
 	}
-
+	if (!unlockedSlots.some((slot) => slot.name === ingredient)) {
+		return { status: "zero", count: 0 };
+	}
 	try {
 		const rankingParameter = {
 			...parameter,
 			level: 0,
 		} satisfies StrengthParameter;
-		const result = strengthCalculator(candidate.iv, rankingParameter);
+		const result = strengthCalculator(iv, rankingParameter);
 		const count =
 			result.ingredients.find((item) => item.name === ingredient)?.count ?? 0;
-		if (!Number.isFinite(count) || count <= 0) {
-			return null;
+		if (!Number.isFinite(count) || count < 0) {
+			return { status: "uncalculable" };
 		}
-		return { count };
+		return count > 0
+			? { status: "positive", count }
+			: { status: "zero", count: 0 };
 	} catch {
-		return null;
+		return { status: "uncalculable" };
 	}
+}
+
+/**
+ * Build the neutral, no-subskill IV for the selected Pokemon's best ingredient
+ * pattern at the ranking level.
+ */
+export function createIngredientRankingBaselineIv(
+	options: IngredientRankingBaselineOptions,
+): PokemonIv | null {
+	const candidates = generateIngredientRankingCandidates(
+		undefined,
+		options.level,
+		options.pokemonName,
+	);
+	const selected = selectBestIngredientCandidates(
+		candidates,
+		options.ingredient,
+		options.parameter,
+		options.strengthCalculator ?? defaultStrengthCalculator,
+	);
+	return selected[0]?.iv ?? null;
+}
+
+/**
+ * Group stable-sorted theoretical ranking entries by exact ingredient count.
+ */
+export function groupIngredientRankingEntries(
+	entries: readonly IngredientRankingEntry[],
+): IngredientRankingCountGroup[] {
+	const groups: IngredientRankingCountGroup[] = [];
+	for (const entry of [...entries].sort(compareIngredientRankingEntries)) {
+		const last = groups.at(-1);
+		if (last?.count === entry.count) {
+			groups[groups.length - 1] = {
+				...last,
+				entries: [...last.entries, entry],
+			};
+		} else {
+			groups.push({ count: entry.count, entries: [entry] });
+		}
+	}
+	return groups;
+}
+
+/**
+ * Merge a comparison evaluation into theoretical count groups.
+ */
+export function mergeIngredientRankingComparison(
+	groups: readonly IngredientRankingCountGroup[],
+	evaluation: IngredientEvaluation,
+	pageSize = 100,
+): IngredientRankingComparison {
+	const normalizedGroups = [...groups]
+		.map((group) => ({ ...group, includesComparison: false }))
+		.sort((a, b) => b.count - a.count);
+	if (evaluation.status === "uncalculable") {
+		return {
+			evaluation,
+			rank: null,
+			groupIndex: null,
+			page: null,
+			groups: normalizedGroups,
+		};
+	}
+
+	const count = evaluation.count;
+	let groupIndex = normalizedGroups.findIndex((group) => group.count === count);
+	if (groupIndex < 0) {
+		groupIndex = normalizedGroups.findIndex((group) => group.count < count);
+		if (groupIndex < 0) {
+			groupIndex = normalizedGroups.length;
+		}
+		normalizedGroups.splice(groupIndex, 0, {
+			count,
+			entries: [],
+			includesComparison: true,
+		});
+	} else {
+		normalizedGroups[groupIndex] = {
+			...normalizedGroups[groupIndex],
+			includesComparison: true,
+		};
+	}
+
+	const safePageSize = Math.max(1, Math.floor(pageSize));
+	return {
+		evaluation,
+		rank: groupIndex + 1,
+		groupIndex,
+		page: Math.floor(groupIndex / safePageSize),
+		groups: normalizedGroups,
+	};
 }
 
 /**
@@ -728,12 +880,11 @@ function generateMythicalPatterns(pokemon: PokemonData): Array<{
 	return patterns;
 }
 
-function isCandidateCalculable(
-	candidate: IngredientRankingCandidate,
+function isIvCalculable(
+	iv: PokemonIv,
 	parameter: StrengthParameter,
 	slots: readonly IngredientSlot[],
 ): boolean {
-	const iv = candidate.iv;
 	if (
 		iv.pokemon.rateNotFixed &&
 		iv.baseIngRate === undefined &&

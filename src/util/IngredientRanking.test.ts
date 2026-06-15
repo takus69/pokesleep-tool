@@ -3,9 +3,14 @@ import {
 	calculateIngredientCount,
 	calculateIngredientRanking,
 	calculateIngredientRankingAsync,
+	createIngredientRankingBaselineIv,
+	evaluatePokemonIngredient,
 	generateIngredientRankingCandidates,
+	groupIngredientRankingEntries,
 	type IngredientRankingCandidate,
+	type IngredientRankingEntry,
 	type IngredientRankingStrengthCalculator,
+	mergeIngredientRankingComparison,
 	rankIngredientPokemon,
 } from "./IngredientRanking";
 import Nature from "./Nature";
@@ -320,6 +325,199 @@ describe("calculateIngredientCount", () => {
 				calculator,
 			),
 		).toEqual({ count: 7 });
+	});
+});
+
+describe("comparison calculation layer", () => {
+	test("creates a neutral no-subskill IV from the top ingredient pattern", () => {
+		const iv = createIngredientRankingBaselineIv({
+			pokemonName: "Skeledirge",
+			level: 60,
+			ingredient: "apple",
+			parameter,
+			strengthCalculator: (candidate) =>
+				strengthResult([
+					{
+						name: "apple",
+						count: candidate.ingredient === "ABC" ? 30 : 10,
+					},
+				]),
+		});
+
+		expect(iv?.pokemonName).toBe("Skeledirge");
+		expect(iv?.level).toBe(60);
+		expect(iv?.ingredient).toBe("ABC");
+		expect(iv?.nature.name).toBe("Serious");
+		expect(iv?.activeSubSkills).toEqual([]);
+	});
+
+	test.each([
+		{ pokemonName: "Toxtricity (Amped)", nature: "Hardy" },
+		{ pokemonName: "Toxtricity (Low Key)", nature: "Serious" },
+	])("uses the form-compatible neutral nature for $pokemonName", ({
+		pokemonName,
+		nature,
+	}) => {
+		const iv = createIngredientRankingBaselineIv({
+			pokemonName,
+			level: 60,
+			ingredient: "milk",
+			parameter,
+			strengthCalculator: () => strengthResult([{ name: "milk", count: 10 }]),
+		});
+
+		expect(iv?.pokemonName).toBe(pokemonName);
+		expect(iv?.nature.name).toBe(nature);
+		expect(iv?.activeSubSkills).toEqual([]);
+	});
+
+	test("returns null when no ingredient pattern can provide the target", () => {
+		expect(
+			createIngredientRankingBaselineIv({
+				pokemonName: "Skeledirge",
+				level: 60,
+				ingredient: "milk",
+				parameter,
+			}),
+		).toBeNull();
+	});
+
+	test.each([
+		{ level: 29, ingredient: "tomato" as const, status: "zero" },
+		{ level: 30, ingredient: "tomato" as const, status: "positive" },
+		{ level: 59, ingredient: "potato" as const, status: "zero" },
+		{ level: 60, ingredient: "potato" as const, status: "positive" },
+	])("distinguishes ingredient unlock boundaries at level $level", ({
+		level,
+		ingredient,
+		status,
+	}) => {
+		const calculator = vi.fn(() =>
+			strengthResult([{ name: ingredient, count: 12 }]),
+		);
+		const result = evaluatePokemonIngredient(
+			candidateFor("Venusaur", "ABC", level).iv,
+			ingredient,
+			parameter,
+			calculator,
+		);
+
+		expect(result.status).toBe(status);
+		expect(calculator).toHaveBeenCalledTimes(status === "positive" ? 1 : 0);
+	});
+
+	test("uses the Pokemon level and overrides parameter.level to zero", () => {
+		const fixedLevelParameter = createStrengthParameter({ level: 100 });
+		const calculator = vi.fn(
+			(iv: PokemonIv, received: typeof fixedLevelParameter) => {
+				expect(iv.level).toBe(30);
+				expect(received.level).toBe(0);
+				return strengthResult([{ name: "tomato", count: 7 }]);
+			},
+		);
+
+		expect(
+			evaluatePokemonIngredient(
+				candidateFor("Venusaur", "ABC", 30).iv,
+				"tomato",
+				fixedLevelParameter,
+				calculator,
+			),
+		).toEqual({ status: "positive", count: 7 });
+		expect(fixedLevelParameter.level).toBe(100);
+	});
+
+	test("distinguishes zero and uncalculable results", () => {
+		const iv = candidateFor("Venusaur", "AAA", 60).iv;
+
+		expect(evaluatePokemonIngredient(iv, "potato", parameter)).toEqual({
+			status: "zero",
+			count: 0,
+		});
+		expect(
+			evaluatePokemonIngredient(iv, "honey", parameter, () => {
+				throw new Error("not calculable");
+			}),
+		).toEqual({ status: "uncalculable" });
+	});
+
+	test("groups exact counts while preserving stable entry order", () => {
+		const first = makeEntry(candidateFor("Pinsir", "AAA", 60), 10);
+		const second = makeEntry(candidateFor("Venusaur", "AAA", 60), 20);
+		const third = makeEntry(candidateFor("Ditto", "AAA", 60), 10);
+
+		const groups = groupIngredientRankingEntries([first, third, second]);
+
+		expect(groups.map((group) => group.count)).toEqual([20, 10]);
+		expect(groups[1].entries).toEqual([first, third]);
+	});
+
+	test("merges equal and between-group comparisons with equivalent ranks", () => {
+		const groups = [
+			{ count: 100, entries: [] },
+			{ count: 80, entries: [] },
+			{ count: 60, entries: [] },
+		];
+
+		const tied = mergeIngredientRankingComparison(groups, {
+			status: "positive",
+			count: 80,
+		});
+		const between = mergeIngredientRankingComparison(groups, {
+			status: "positive",
+			count: 90,
+		});
+
+		expect(tied).toMatchObject({ rank: 2, groupIndex: 1, page: 0 });
+		expect(tied.groups).toHaveLength(3);
+		expect(tied.groups[1].includesComparison).toBe(true);
+		expect(between).toMatchObject({ rank: 2, groupIndex: 1, page: 0 });
+		expect(between.groups.map((group) => group.count)).toEqual([
+			100, 90, 80, 60,
+		]);
+	});
+
+	test("places zero last and leaves uncalculable without a rank", () => {
+		const groups = [
+			{ count: 30, entries: [] },
+			{ count: 10, entries: [] },
+		];
+		const zero = mergeIngredientRankingComparison(groups, {
+			status: "zero",
+			count: 0,
+		});
+		const uncalculable = mergeIngredientRankingComparison(groups, {
+			status: "uncalculable",
+		});
+
+		expect(zero).toMatchObject({ rank: 3, groupIndex: 2, page: 0 });
+		expect(zero.groups.at(-1)).toMatchObject({
+			count: 0,
+			includesComparison: true,
+		});
+		expect(uncalculable).toMatchObject({
+			rank: null,
+			groupIndex: null,
+			page: null,
+		});
+		expect(uncalculable.groups).toHaveLength(2);
+	});
+
+	test("returns a 100-row page index for the comparison group", () => {
+		const groups = Array.from({ length: 101 }, (_, index) => ({
+			count: 200 - index,
+			entries: [],
+		}));
+		const result = mergeIngredientRankingComparison(groups, {
+			status: "positive",
+			count: 100,
+		});
+
+		expect(result).toMatchObject({
+			rank: 101,
+			groupIndex: 100,
+			page: 1,
+		});
 	});
 });
 
@@ -913,6 +1111,23 @@ function makeCandidate(
 	ingredientKey: string,
 ): IngredientRankingCandidate {
 	return { iv, ingredientKey, ingredientOrder: 0, ordinal: 0 };
+}
+
+function makeEntry(
+	candidate: IngredientRankingCandidate,
+	count: number,
+): IngredientRankingEntry {
+	return {
+		...candidate,
+		pokemon: candidate.iv.pokemon,
+		ingredientSlots: [
+			candidate.iv.ingredient1,
+			candidate.iv.ingredient2,
+			candidate.iv.ingredient3,
+		],
+		count,
+		metric: { count },
+	};
 }
 
 function strengthResult(
