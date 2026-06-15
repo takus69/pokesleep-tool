@@ -83,6 +83,40 @@ describe("generateIngredientRankingCandidates", () => {
 		expect(first.map(summarize)).toEqual(second.map(summarize));
 	});
 
+	test("generates candidates for only the requested final Pokemon/form", () => {
+		const candidates = generateIngredientRankingCandidates(
+			undefined,
+			60,
+			"Skeledirge",
+		);
+
+		expect(candidates).toHaveLength(6);
+		expect(
+			candidates.every(
+				(candidate) => candidate.iv.pokemonName === "Skeledirge",
+			),
+		).toBe(true);
+		expect(
+			generateIngredientRankingCandidates(undefined, 60, "Fuecoco"),
+		).toEqual([]);
+	});
+
+	test.each([
+		"Toxtricity (Amped)",
+		"Toxtricity (Low Key)",
+	])("keeps Toxtricity form candidates separate for %s", (pokemonName) => {
+		const candidates = generateIngredientRankingCandidates(
+			undefined,
+			60,
+			pokemonName,
+		);
+
+		expect(candidates).toHaveLength(6);
+		expect(
+			candidates.every((candidate) => candidate.iv.pokemonName === pokemonName),
+		).toBe(true);
+	});
+
 	test("uses all six normal patterns when ing3 exists", () => {
 		const candidates = candidatesFor("Venusaur", 60);
 
@@ -327,7 +361,107 @@ describe("calculateIngredientRanking", () => {
 		expect(result[0].ingredientKey).toBe("AAA");
 	});
 
-	test("evaluates all 25 natures after baseline selection", () => {
+	test("single-Pokemon ranking never calculates another Pokemon", () => {
+		const calculator = vi.fn((iv: PokemonIv) => {
+			expect(iv.pokemonName).toBe("Skeledirge");
+			return strengthResult([{ name: "apple", count: 10 }]);
+		});
+
+		const result = calculateIngredientRanking({
+			pokemonName: "Skeledirge",
+			level: 9,
+			ingredient: "apple",
+			parameter,
+			strengthCalculator: calculator,
+		});
+
+		expect(result).toHaveLength(1);
+		expect(result[0].iv.pokemonName).toBe("Skeledirge");
+		expect(calculator).toHaveBeenCalledTimes(6 + 1 + 21);
+	});
+
+	test.each([
+		{ pokemonName: "Toxtricity (Amped)", baselineNature: "Hardy" },
+		{ pokemonName: "Toxtricity (Low Key)", baselineNature: "Serious" },
+	])("keeps $pokemonName results separate with its neutral baseline", ({
+		pokemonName,
+		baselineNature,
+	}) => {
+		const calculatedPokemonNames = new Set<string>();
+		const result = calculateIngredientRanking({
+			pokemonName,
+			level: 9,
+			ingredient: "milk",
+			parameter,
+			strengthCalculator: (iv) => {
+				calculatedPokemonNames.add(iv.pokemonName);
+				return strengthResult([{ name: "milk", count: 10 }]);
+			},
+		});
+
+		expect(calculatedPokemonNames).toEqual(new Set([pokemonName]));
+		expect(result).toHaveLength(1);
+		expect(result[0].iv.pokemonName).toBe(pokemonName);
+		expect(result[0].iv.nature.name).toBe(baselineNature);
+		expect(result[0].iv.activeSubSkills).toEqual([]);
+	});
+
+	test("returns no ranking when the Pokemon has no target ingredient", () => {
+		const calculator = vi.fn(() =>
+			strengthResult([{ name: "milk", count: 10 }]),
+		);
+
+		const result = calculateIngredientRanking({
+			pokemonName: "Skeledirge",
+			level: 60,
+			ingredient: "milk",
+			parameter,
+			strengthCalculator: calculator,
+		});
+
+		expect(result).toEqual([]);
+		expect(calculator).not.toHaveBeenCalled();
+	});
+
+	test("selects the best normal ingredient pattern before ranking", () => {
+		const result = calculateIngredientRanking({
+			pokemonName: "Skeledirge",
+			level: 60,
+			ingredient: "apple",
+			parameter,
+			strengthCalculator: (iv) =>
+				strengthResult([
+					{
+						name: "apple",
+						count: iv.ingredient === "ABC" ? 30 : 10,
+					},
+				]),
+		});
+
+		expect(result).toHaveLength(1);
+		expect(result[0].ingredientKey).toBe("ABC");
+	});
+
+	test("selects the best mythical ingredient pattern before ranking", () => {
+		const result = calculateIngredientRanking({
+			pokemonName: "Mew",
+			level: 60,
+			ingredient: "tail",
+			parameter,
+			strengthCalculator: (iv) =>
+				strengthResult([
+					{
+						name: "tail",
+						count: iv.mythIng1 === "egg" && iv.mythIng2 === "herb" ? 30 : 10,
+					},
+				]),
+		});
+
+		expect(result).toHaveLength(1);
+		expect(result[0].ingredientKey).toBe("egg/herb/tail");
+	});
+
+	test("evaluates 21 ranking natures with neutral natures collapsed to Serious", () => {
 		const evaluatedNatures: string[] = [];
 		let calls = 0;
 		const calculator: IngredientRankingStrengthCalculator = (iv) => {
@@ -345,17 +479,21 @@ describe("calculateIngredientRanking", () => {
 			calculator,
 		);
 
-		expect(calls).toBe(1 + 25);
-		expect(evaluatedNatures).toEqual(
-			Nature.allNatures.map((nature) => nature.name),
-		);
+		expect(calls).toBe(1 + 1 + 21);
+		expect(evaluatedNatures[0]).toBe("Serious");
+		expect(evaluatedNatures.slice(1)).toEqual([
+			"Serious",
+			...Nature.allNatures
+				.filter((nature) => !nature.isNeautral)
+				.map((nature) => nature.name),
+		]);
 	});
 
 	test.each([
 		{ level: 9, combinations: 1 },
-		{ level: 10, combinations: 17 },
-		{ level: 25, combinations: 136 },
-		{ level: 50, combinations: 680 },
+		{ level: 10, combinations: 12 },
+		{ level: 25, combinations: 66 },
+		{ level: 50, combinations: 220 },
 	])("evaluates canonical sub-skill combinations at level $level", ({
 		level,
 		combinations,
@@ -377,8 +515,8 @@ describe("calculateIngredientRanking", () => {
 			calculator,
 		);
 
-		expect(calls).toBe(1 + 25 * combinations);
-		expect(evaluated.size).toBe(combinations);
+		expect(calls).toBe(1 + 1 + 21 * combinations);
+		expect(evaluated.size).toBe(level < 10 ? 1 : combinations + 1);
 	});
 
 	test("does not inherit nature or sub-skills from the current IV", () => {
@@ -403,10 +541,10 @@ describe("calculateIngredientRanking", () => {
 
 		expect(evaluated[0].nature.isNeautral).toBe(true);
 		expect(evaluated[0].activeSubSkills).toEqual([]);
-		expect(evaluated[1].nature.name).toBe(Nature.allNatures[0].name);
-		expect(evaluated[1].activeSubSkills[0].name).toBe(
-			SubSkill.allSubSkills[0].name,
-		);
+		expect(evaluated[1].nature.name).toBe("Serious");
+		expect(evaluated[1].activeSubSkills).toEqual([]);
+		expect(evaluated[2].nature.name).toBe("Serious");
+		expect(evaluated[2].activeSubSkills[0].name).toBe("Berry Finding S");
 	});
 
 	test("collapses exact equal counts to the first stable representative", () => {
@@ -418,10 +556,65 @@ describe("calculateIngredientRanking", () => {
 		);
 
 		expect(result).toHaveLength(1);
-		expect(result[0].iv.nature.name).toBe(Nature.allNatures[0].name);
-		expect(result[0].iv.activeSubSkills.map((skill) => skill.name)).toEqual([
-			SubSkill.allSubSkills[0].name,
-		]);
+		expect(result[0].iv.nature.name).toBe("Serious");
+		expect(result[0].iv.activeSubSkills).toEqual([]);
+	});
+
+	test("includes the Serious no-subskill baseline as a ranking candidate", () => {
+		const result = calculateIngredientRanking(
+			[candidateFor("Venusaur", "AAA", 10)],
+			"honey",
+			parameter,
+			(iv) =>
+				strengthResult([
+					{
+						name: "honey",
+						count: iv.activeSubSkills.length === 0 ? 1 : 2,
+					},
+				]),
+		);
+		const baseline = result.find((entry) => entry.count === 1);
+
+		expect(baseline?.iv.nature.name).toBe("Serious");
+		expect(baseline?.iv.activeSubSkills).toEqual([]);
+	});
+
+	test("uses only the 12 ingredient-ranking sub-skills at level 60", () => {
+		const evaluated = new Set<string>();
+		let calls = 0;
+
+		calculateIngredientRanking({
+			pokemonName: "Skeledirge",
+			level: 60,
+			ingredient: "apple",
+			parameter,
+			strengthCalculator: (iv) => {
+				calls += 1;
+				if (iv.activeSubSkills.length === 3) {
+					evaluated.add(
+						iv.activeSubSkills.map((skill) => skill.name).join("/"),
+					);
+				}
+				return strengthResult([{ name: "apple", count: 10 }]);
+			},
+		});
+
+		expect(evaluated.size).toBe(220);
+		expect(
+			[...evaluated].some((combination) =>
+				[
+					"Dream Shard Bonus",
+					"Research EXP Bonus",
+					"Sleep EXP Bonus",
+					"Skill Level Up M",
+					"Skill Level Up S",
+				].some((name) => combination.includes(name)),
+			),
+		).toBe(false);
+		expect(
+			[...evaluated].some((value) => value.includes("Energy Recovery Bonus")),
+		).toBe(true);
+		expect(calls).toBe(6 + 1 + 21 * 220);
 	});
 
 	test("default-calculator cache preserves distinct counts and representatives", () => {
@@ -557,7 +750,7 @@ describe("calculateIngredientRanking", () => {
 		).rejects.toMatchObject({ name: "AbortError" });
 
 		expect(evaluationCalls).toBeGreaterThan(0);
-		expect(evaluationCalls).toBeLessThan(25 * 680);
+		expect(evaluationCalls).toBeLessThan(21 * 220);
 	});
 
 	test("options API works without baseIv", () => {
@@ -642,7 +835,7 @@ describe("calculateIngredientRanking", () => {
 		);
 
 		expect(fixedLevelParameter.level).toBe(10);
-		expect(calculator).toHaveBeenCalledTimes(26);
+		expect(calculator).toHaveBeenCalledTimes(23);
 	});
 
 	test("excludes candidates that cannot be calculated", () => {

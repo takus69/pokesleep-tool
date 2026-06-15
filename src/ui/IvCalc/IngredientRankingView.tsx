@@ -1,6 +1,8 @@
 import {
+	Button,
 	CircularProgress,
 	FormControl,
+	FormLabel,
 	InputLabel,
 	MenuItem,
 	Select,
@@ -9,23 +11,54 @@ import {
 import { styled } from "@mui/system";
 import React from "react";
 import { useTranslation } from "react-i18next";
-import { type IngredientName, IngredientNames } from "../../data/pokemons";
+import pokemons, {
+	type IngredientName,
+	IngredientNames,
+} from "../../data/pokemons";
 import {
 	calculateIngredientRankingAsync,
 	type IngredientRankingEntry,
 } from "../../util/IngredientRanking";
+import PokemonIv from "../../util/PokemonIv";
 import type { StrengthParameter } from "../../util/PokemonStrength";
 import IngredientCountIcon from "./IngredientCountIcon";
 import IngredientIcon from "./IngredientIcon";
+import PokemonSelectDialog from "./IvForm/PokemonSelectDialog";
+import type { PokemonOption } from "./IvForm/PokemonTextField";
 import PokemonIcon from "./PokemonIcon";
 
 const IngredientRankingView = React.memo(
 	({ parameter }: { parameter: StrengthParameter }) => {
 		const { i18n, t } = useTranslation();
+		const [pokemonName, setPokemonName] = React.useState("Skeledirge");
 		const [ingredient, setIngredient] = React.useState<IngredientName>("apple");
 		const [level, setLevel] = React.useState(60);
 		const [ranking, setRanking] = React.useState<IngredientRankingEntry[]>([]);
 		const [calculating, setCalculating] = React.useState(true);
+		const [pokemonDialogOpen, setPokemonDialogOpen] = React.useState(false);
+
+		const pokemonOptions = React.useMemo<PokemonOption[]>(
+			() =>
+				pokemons
+					.filter((pokemon) => pokemon.isFullyEvolved)
+					.map((pokemon) => ({
+						...pokemon,
+						idForm: new PokemonIv({ pokemonName: pokemon.name }).idForm,
+						localName: t(`pokemons.${pokemon.name}`),
+						isNonEvolving: pokemon.evolutionCount === -1,
+						isFullyEvolved: true,
+						ing1Name: pokemon.ing1.name,
+						ing2Name: pokemon.ing2.name,
+						ing3Name: pokemon.ing3?.name,
+					})),
+			[t],
+		);
+		const selectedPokemon = pokemonOptions.find(
+			(option) => option.name === pokemonName,
+		);
+		if (selectedPokemon === undefined) {
+			throw new Error(`Pokemon ${pokemonName} is not available`);
+		}
 
 		React.useEffect(() => {
 			const controller = new AbortController();
@@ -33,6 +66,7 @@ const IngredientRankingView = React.memo(
 			setCalculating(true);
 
 			calculateIngredientRankingAsync({
+				pokemonName,
 				ingredient,
 				level,
 				parameter,
@@ -60,7 +94,17 @@ const IngredientRankingView = React.memo(
 				active = false;
 				controller.abort();
 			};
-		}, [ingredient, level, parameter]);
+		}, [ingredient, level, parameter, pokemonName]);
+
+		const onPokemonButtonClick = React.useCallback(() => {
+			setPokemonDialogOpen(true);
+		}, []);
+		const onPokemonDialogClose = React.useCallback(() => {
+			setPokemonDialogOpen(false);
+		}, []);
+		const onPokemonChange = React.useCallback((value: PokemonOption) => {
+			setPokemonName(value.name);
+		}, []);
 
 		const onIngredientChange = React.useCallback(
 			(event: { target: { value: unknown } }) => {
@@ -97,6 +141,21 @@ const IngredientRankingView = React.memo(
 		return (
 			<StyledRanking>
 				<StyledControls>
+					<FormControl required>
+						<StyledPokemonLabel>{t("pokemon")}</StyledPokemonLabel>
+						<StyledPokemonButton
+							variant="outlined"
+							size="small"
+							onClick={onPokemonButtonClick}
+						>
+							<PokemonIcon
+								idForm={selectedPokemon.idForm}
+								shiny={false}
+								size={28}
+							/>
+							<span>{selectedPokemon.localName}</span>
+						</StyledPokemonButton>
+					</FormControl>
 					<FormControl variant="standard" size="small" required>
 						<InputLabel id="ingredient-ranking-target-label">
 							{t("target ingredient")}
@@ -125,6 +184,14 @@ const IngredientRankingView = React.memo(
 						slotProps={{ htmlInput: { min: 1, max: 100, step: 1 } }}
 					/>
 				</StyledControls>
+				<PokemonSelectDialog
+					open={pokemonDialogOpen}
+					shiny={false}
+					pokemonOptions={pokemonOptions}
+					selectedValue={selectedPokemon}
+					onClose={onPokemonDialogClose}
+					onChange={onPokemonChange}
+				/>
 
 				<StyledResults>
 					<StyledHeader>
@@ -206,12 +273,39 @@ const StyledRanking = styled("section")({
 
 const StyledControls = styled("div")({
 	display: "grid",
-	gridTemplateColumns: "minmax(10rem, 1fr) minmax(5rem, .4fr)",
+	gridTemplateColumns:
+		"minmax(10rem, 1.2fr) minmax(10rem, 1fr) minmax(5rem, .4fr)",
 	gap: "1rem",
 	alignItems: "end",
 	marginBottom: ".8rem",
 	"& svg": {
 		verticalAlign: "middle",
+	},
+	"@media (max-width: 600px)": {
+		gridTemplateColumns: "minmax(0, 1fr) minmax(5rem, .45fr)",
+		"& > div:first-of-type": {
+			gridColumn: "1 / -1",
+		},
+	},
+});
+
+const StyledPokemonLabel = styled(FormLabel)({
+	marginBottom: ".15rem",
+	fontSize: ".75rem",
+	lineHeight: 1,
+});
+
+const StyledPokemonButton = styled(Button)({
+	justifyContent: "flex-start",
+	gap: ".4rem",
+	minWidth: 0,
+	padding: ".2rem .5rem",
+	color: "inherit",
+	textTransform: "none",
+	"& > span": {
+		overflow: "hidden",
+		textOverflow: "ellipsis",
+		whiteSpace: "nowrap",
 	},
 });
 
