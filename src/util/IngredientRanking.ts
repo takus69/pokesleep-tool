@@ -16,6 +16,9 @@ export type IngredientRankingLevel = number;
 
 export type IngredientRankingStrengthResult = {
 	ingredients: IngredientStrength[];
+	totalStrength?: number;
+	berryTotalStrength?: number;
+	skillCount?: number;
 };
 
 export type IngredientRankingStrengthCalculator = (
@@ -41,6 +44,12 @@ export interface IngredientCountMetric {
 	count: number;
 }
 
+export type IngredientRankingTarget =
+	| "ingredientCount"
+	| "totalStrength"
+	| "berryStrength"
+	| "skillCount";
+
 export interface IngredientRankingEntry extends IngredientRankingCandidate {
 	pokemon: PokemonData;
 	ingredientSlots: IngredientSlot[];
@@ -54,7 +63,8 @@ export interface IngredientRankingOptions {
 	/** Restricts candidates to one exact Pokemon/form name. */
 	pokemonName?: string;
 	level: IngredientRankingLevel;
-	ingredient: IngredientName;
+	target?: IngredientRankingTarget;
+	ingredient?: IngredientName;
 	parameter: StrengthParameter;
 	strengthCalculator?: IngredientRankingStrengthCalculator;
 	/** Maximum number of entries returned after the final stable sort. */
@@ -66,7 +76,8 @@ export interface IngredientRankingOptions {
 export interface IngredientRankingBaselineOptions {
 	pokemonName: string;
 	level: IngredientRankingLevel;
-	ingredient: IngredientName;
+	target?: IngredientRankingTarget;
+	ingredient?: IngredientName;
 	parameter: StrengthParameter;
 	strengthCalculator?: IngredientRankingStrengthCalculator;
 }
@@ -75,6 +86,8 @@ export type IngredientEvaluation =
 	| { status: "positive"; count: number }
 	| { status: "zero"; count: 0 }
 	| { status: "uncalculable" };
+
+const defaultRankingTarget: IngredientRankingTarget = "ingredientCount";
 
 export interface IngredientRankingCountGroup {
 	count: number;
@@ -190,6 +203,26 @@ export function calculateIngredientCount(
 }
 
 /**
+ * Calculate the selected ranking metric for a candidate.
+ */
+export function calculateIngredientRankingMetric(
+	candidate: IngredientRankingCandidate,
+	target: IngredientRankingTarget,
+	ingredient: IngredientName | undefined,
+	parameter: StrengthParameter,
+	strengthCalculator: IngredientRankingStrengthCalculator = defaultStrengthCalculator,
+): IngredientCountMetric | null {
+	const evaluation = evaluatePokemonRankingTarget(
+		candidate.iv,
+		target,
+		ingredient,
+		parameter,
+		strengthCalculator,
+	);
+	return evaluation.status === "positive" ? { count: evaluation.count } : null;
+}
+
+/**
  * Evaluate one Pokemon using its own level and helper-produced ingredients.
  */
 export function evaluatePokemonIngredient(
@@ -229,6 +262,49 @@ export function evaluatePokemonIngredient(
 }
 
 /**
+ * Evaluate one Pokemon using the currently selected ranking target.
+ */
+export function evaluatePokemonRankingTarget(
+	iv: PokemonIv,
+	target: IngredientRankingTarget,
+	ingredient: IngredientName | undefined,
+	parameter: StrengthParameter,
+	strengthCalculator: IngredientRankingStrengthCalculator = defaultStrengthCalculator,
+): IngredientEvaluation {
+	if (target === "ingredientCount") {
+		return ingredient === undefined
+			? { status: "uncalculable" }
+			: evaluatePokemonIngredient(
+					iv,
+					ingredient,
+					parameter,
+					strengthCalculator,
+				);
+	}
+
+	const unlockedSlots = getUnlockedIngredientSlots(iv);
+	if (unlockedSlots === null || !isIvCalculable(iv, parameter, unlockedSlots)) {
+		return { status: "uncalculable" };
+	}
+	try {
+		const rankingParameter = {
+			...parameter,
+			level: 0,
+		} satisfies StrengthParameter;
+		const result = strengthCalculator(iv, rankingParameter);
+		const count = getRankingTargetValue(result, target);
+		if (!Number.isFinite(count) || count < 0) {
+			return { status: "uncalculable" };
+		}
+		return count > 0
+			? { status: "positive", count }
+			: { status: "zero", count: 0 };
+	} catch {
+		return { status: "uncalculable" };
+	}
+}
+
+/**
  * Build the neutral, no-subskill IV for the selected Pokemon's best ingredient
  * pattern at the ranking level.
  */
@@ -242,6 +318,7 @@ export function createIngredientRankingBaselineIv(
 	);
 	const selected = selectBestIngredientCandidates(
 		candidates,
+		options.target ?? defaultRankingTarget,
 		options.ingredient,
 		options.parameter,
 		options.strengthCalculator ?? defaultStrengthCalculator,
@@ -353,6 +430,7 @@ export function calculateIngredientRanking(
 
 	const selectedCandidates = selectBestIngredientCandidates(
 		context.candidates,
+		context.target,
 		context.ingredient,
 		context.parameter,
 		context.calculator,
@@ -381,6 +459,7 @@ export async function calculateIngredientRankingAsync(
 
 	const selectedCandidates = await selectBestIngredientCandidatesAsync(
 		context.candidates,
+		context.target,
 		context.ingredient,
 		context.parameter,
 		context.calculator,
@@ -404,7 +483,8 @@ export async function calculateIngredientRankingAsync(
 
 interface IngredientRankingContext {
 	candidates: readonly IngredientRankingCandidate[];
-	ingredient: IngredientName;
+	target: IngredientRankingTarget;
+	ingredient: IngredientName | undefined;
 	parameter: StrengthParameter;
 	calculator: IngredientRankingStrengthCalculator;
 	limit?: number;
@@ -429,14 +509,19 @@ function createRankingContext(
 			)
 		: (optionsOrCandidates as readonly IngredientRankingCandidate[]);
 	const targetIngredient = options?.ingredient ?? ingredient;
+	const target = options?.target ?? defaultRankingTarget;
 	const strengthParameter = options?.parameter ?? parameter;
 
-	if (targetIngredient === undefined || strengthParameter === undefined) {
+	if (
+		strengthParameter === undefined ||
+		(target === "ingredientCount" && targetIngredient === undefined)
+	) {
 		return null;
 	}
 
 	return {
 		candidates,
+		target,
 		ingredient: targetIngredient,
 		parameter: strengthParameter,
 		calculator:
@@ -587,8 +672,9 @@ function evaluateCandidateCombination(
 		natureOrder,
 		subSkillOrder: combination.order,
 	};
-	const metric = calculateIngredientCount(
+	const metric = calculateIngredientRankingMetric(
 		candidate,
+		context.target,
 		context.ingredient,
 		context.parameter,
 		context.calculator,
@@ -683,7 +769,8 @@ interface SelectedIngredientCandidate {
 
 function selectBestIngredientCandidates(
 	candidates: readonly IngredientRankingCandidate[],
-	ingredient: IngredientName,
+	target: IngredientRankingTarget,
+	ingredient: IngredientName | undefined,
 	parameter: StrengthParameter,
 	strengthCalculator: IngredientRankingStrengthCalculator,
 ): IngredientRankingCandidate[] {
@@ -693,6 +780,7 @@ function selectBestIngredientCandidates(
 		selectIngredientCandidate(
 			selected,
 			candidate,
+			target,
 			ingredient,
 			parameter,
 			strengthCalculator,
@@ -704,7 +792,8 @@ function selectBestIngredientCandidates(
 
 async function selectBestIngredientCandidatesAsync(
 	candidates: readonly IngredientRankingCandidate[],
-	ingredient: IngredientName,
+	target: IngredientRankingTarget,
+	ingredient: IngredientName | undefined,
 	parameter: StrengthParameter,
 	strengthCalculator: IngredientRankingStrengthCalculator,
 	signal?: AbortSignal,
@@ -715,6 +804,7 @@ async function selectBestIngredientCandidatesAsync(
 		selectIngredientCandidate(
 			selected,
 			candidate,
+			target,
 			ingredient,
 			parameter,
 			strengthCalculator,
@@ -731,7 +821,8 @@ async function selectBestIngredientCandidatesAsync(
 function selectIngredientCandidate(
 	selected: Map<string, SelectedIngredientCandidate>,
 	candidate: IngredientRankingCandidate,
-	ingredient: IngredientName,
+	target: IngredientRankingTarget,
+	ingredient: IngredientName | undefined,
 	parameter: StrengthParameter,
 	strengthCalculator: IngredientRankingStrengthCalculator,
 ): void {
@@ -743,8 +834,9 @@ function selectIngredientCandidate(
 			subSkills: new SubSkillList(),
 		}),
 	};
-	const metric = calculateIngredientCount(
+	const metric = calculateIngredientRankingMetric(
 		baselineCandidate,
+		target,
 		ingredient,
 		parameter,
 		strengthCalculator,
@@ -773,6 +865,20 @@ function compareIngredientCandidateOrder(
 	b: IngredientRankingCandidate,
 ): number {
 	return a.ingredientOrder - b.ingredientOrder || a.ordinal - b.ordinal;
+}
+
+function getRankingTargetValue(
+	result: IngredientRankingStrengthResult,
+	target: Exclude<IngredientRankingTarget, "ingredientCount">,
+): number {
+	switch (target) {
+		case "totalStrength":
+			return result.totalStrength ?? Number.NaN;
+		case "berryStrength":
+			return result.berryTotalStrength ?? Number.NaN;
+		case "skillCount":
+			return result.skillCount ?? Number.NaN;
+	}
 }
 
 function* generateSubSkillCombinations(
@@ -816,10 +922,13 @@ function getIngredientCalculationCacheKey(
 	return [
 		nature.energyRecoveryFactor,
 		nature.speedOfHelpFactor,
+		nature.mainSkillChanceFactor,
 		nature.ingredientFindingFactor,
 		activeSubSkills.reduce((sum, skill) => sum + skill.helpingSpeed, 0),
 		activeSubSkills.reduce((sum, skill) => sum + skill.ingredientFinder, 0),
 		activeSubSkills.reduce((sum, skill) => sum + skill.inventory, 0),
+		activeSubSkills.reduce((sum, skill) => sum + skill.skillTrigger, 0),
+		activeSubSkills.reduce((sum, skill) => sum + skill.skillLevelUp, 0),
 		activeSubSkills.some((skill) => skill.name === "Helping Bonus"),
 		activeSubSkills.some((skill) => skill.name === "Energy Recovery Bonus"),
 		activeSubSkills.some((skill) => skill.isBFS),

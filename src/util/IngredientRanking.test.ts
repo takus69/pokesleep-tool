@@ -3,8 +3,10 @@ import {
 	calculateIngredientCount,
 	calculateIngredientRanking,
 	calculateIngredientRankingAsync,
+	calculateIngredientRankingMetric,
 	createIngredientRankingBaselineIv,
 	evaluatePokemonIngredient,
+	evaluatePokemonRankingTarget,
 	generateIngredientRankingCandidates,
 	groupIngredientRankingEntries,
 	type IngredientRankingCandidate,
@@ -328,6 +330,59 @@ describe("calculateIngredientCount", () => {
 	});
 });
 
+describe("calculateIngredientRankingMetric", () => {
+	test.each([
+		{ target: "totalStrength" as const, expected: 1234 },
+		{ target: "berryStrength" as const, expected: 567 },
+		{ target: "skillCount" as const, expected: 8.5 },
+	])("reads $target without requiring a selected ingredient", ({
+		target,
+		expected,
+	}) => {
+		const calculator = vi.fn(() =>
+			strengthResult([], {
+				totalStrength: 1234,
+				berryTotalStrength: 567,
+				skillCount: 8.5,
+			}),
+		);
+
+		expect(
+			calculateIngredientRankingMetric(
+				candidateFor("Skeledirge", "AAA", 60),
+				target,
+				undefined,
+				parameter,
+				calculator,
+			),
+		).toEqual({ count: expected });
+		expect(calculator).toHaveBeenCalledTimes(1);
+	});
+
+	test("excludes missing or invalid non-ingredient metrics", () => {
+		const candidate = candidateFor("Skeledirge", "AAA", 60);
+
+		expect(
+			calculateIngredientRankingMetric(
+				candidate,
+				"totalStrength",
+				undefined,
+				parameter,
+				() => strengthResult([]),
+			),
+		).toBeNull();
+		expect(
+			calculateIngredientRankingMetric(
+				candidate,
+				"skillCount",
+				undefined,
+				parameter,
+				() => strengthResult([], { skillCount: -1 }),
+			),
+		).toBeNull();
+	});
+});
+
 describe("comparison calculation layer", () => {
 	test("creates a neutral no-subskill IV from the top ingredient pattern", () => {
 		const iv = createIngredientRankingBaselineIv({
@@ -342,6 +397,25 @@ describe("comparison calculation layer", () => {
 						count: candidate.ingredient === "ABC" ? 30 : 10,
 					},
 				]),
+		});
+
+		expect(iv?.pokemonName).toBe("Skeledirge");
+		expect(iv?.level).toBe(60);
+		expect(iv?.ingredient).toBe("ABC");
+		expect(iv?.nature.name).toBe("Serious");
+		expect(iv?.activeSubSkills).toEqual([]);
+	});
+
+	test("creates a neutral no-subskill IV from the top selected metric pattern", () => {
+		const iv = createIngredientRankingBaselineIv({
+			pokemonName: "Skeledirge",
+			level: 60,
+			target: "totalStrength",
+			parameter,
+			strengthCalculator: (candidate) =>
+				strengthResult([], {
+					totalStrength: candidate.ingredient === "ABC" ? 300 : 100,
+				}),
 		});
 
 		expect(iv?.pokemonName).toBe("Skeledirge");
@@ -439,6 +513,20 @@ describe("comparison calculation layer", () => {
 				throw new Error("not calculable");
 			}),
 		).toEqual({ status: "uncalculable" });
+	});
+
+	test("evaluates comparison Pokemon with the selected non-ingredient metric", () => {
+		const iv = candidateFor("Skeledirge", "AAA", 60).iv;
+
+		expect(
+			evaluatePokemonRankingTarget(
+				iv,
+				"berryStrength",
+				undefined,
+				parameter,
+				() => strengthResult([], { berryTotalStrength: 40 }),
+			),
+		).toEqual({ status: "positive", count: 40 });
 	});
 
 	test("groups exact counts while preserving stable entry order", () => {
@@ -638,6 +726,23 @@ describe("calculateIngredientRanking", () => {
 
 		expect(result).toHaveLength(1);
 		expect(result[0].ingredientKey).toBe("ABC");
+	});
+
+	test("selects the best pattern by the selected non-ingredient target", () => {
+		const result = calculateIngredientRanking({
+			pokemonName: "Skeledirge",
+			level: 60,
+			target: "totalStrength",
+			parameter,
+			strengthCalculator: (iv) =>
+				strengthResult([], {
+					totalStrength: iv.ingredient === "ABC" ? 30 : 10,
+				}),
+		});
+
+		expect(result).toHaveLength(1);
+		expect(result[0].ingredientKey).toBe("ABC");
+		expect(result[0].count).toBe(30);
 	});
 
 	test("selects the best mythical ingredient pattern before ranking", () => {
@@ -1132,8 +1237,14 @@ function makeEntry(
 
 function strengthResult(
 	ingredients: Array<{ name: PokemonIv["ingredient1"]["name"]; count: number }>,
+	metrics: {
+		totalStrength?: number;
+		berryTotalStrength?: number;
+		skillCount?: number;
+	} = {},
 ) {
 	return {
+		...metrics,
 		ingredients: ingredients.map(({ name, count }) => ({
 			name,
 			count,

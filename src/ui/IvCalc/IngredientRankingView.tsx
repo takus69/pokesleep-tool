@@ -24,9 +24,10 @@ import pokemons, {
 import {
 	calculateIngredientRankingAsync,
 	createIngredientRankingBaselineIv,
-	evaluatePokemonIngredient,
+	evaluatePokemonRankingTarget,
 	groupIngredientRankingEntries,
 	type IngredientRankingEntry,
+	type IngredientRankingTarget,
 	mergeIngredientRankingComparison,
 } from "../../util/IngredientRanking";
 import PokemonIv from "../../util/PokemonIv";
@@ -43,6 +44,18 @@ import StrengthParameterSummary from "./Strength/StrengthParameterSummary";
 const pageSize = 100;
 
 type ComparisonMode = "baseline" | "manual" | "registered";
+const rankingTargets: IngredientRankingTarget[] = [
+	"ingredientCount",
+	"totalStrength",
+	"berryStrength",
+	"skillCount",
+];
+const rankingTargetLabelKeys = {
+	ingredientCount: "ranking target ingredient count",
+	totalStrength: "ranking target total strength",
+	berryStrength: "ranking target berry strength",
+	skillCount: "ranking target skill count",
+} satisfies Record<IngredientRankingTarget, string>;
 
 const IngredientRankingView = React.memo(
 	({
@@ -55,6 +68,8 @@ const IngredientRankingView = React.memo(
 		const { i18n, t } = useTranslation();
 		const parameter = state.parameter;
 		const [pokemonName, setPokemonName] = React.useState("Skeledirge");
+		const [rankingTarget, setRankingTarget] =
+			React.useState<IngredientRankingTarget>("ingredientCount");
 		const [ingredient, setIngredient] = React.useState<IngredientName>("apple");
 		const [level, setLevel] = React.useState(60);
 		const [ranking, setRanking] = React.useState<IngredientRankingEntry[]>([]);
@@ -101,6 +116,7 @@ const IngredientRankingView = React.memo(
 
 			calculateIngredientRankingAsync({
 				pokemonName,
+				target: rankingTarget,
 				ingredient,
 				level,
 				parameter,
@@ -127,7 +143,7 @@ const IngredientRankingView = React.memo(
 				active = false;
 				controller.abort();
 			};
-		}, [ingredient, level, parameter, pokemonName]);
+		}, [ingredient, level, parameter, pokemonName, rankingTarget]);
 
 		const onPokemonButtonClick = React.useCallback(() => {
 			setPokemonDialogOpen(true);
@@ -150,6 +166,13 @@ const IngredientRankingView = React.memo(
 		const onIngredientChange = React.useCallback(
 			(event: { target: { value: unknown } }) => {
 				setIngredient(event.target.value as IngredientName);
+				setPage(1);
+			},
+			[],
+		);
+		const onRankingTargetChange = React.useCallback(
+			(event: { target: { value: unknown } }) => {
+				setRankingTarget(event.target.value as IngredientRankingTarget);
 				setPage(1);
 			},
 			[],
@@ -222,10 +245,11 @@ const IngredientRankingView = React.memo(
 				createIngredientRankingBaselineIv({
 					pokemonName,
 					level,
+					target: rankingTarget,
 					ingredient,
 					parameter,
 				}),
-			[ingredient, level, parameter, pokemonName],
+			[ingredient, level, parameter, pokemonName, rankingTarget],
 		);
 		React.useEffect(() => {
 			if (resetComparisonRef.current && baselineIv !== null) {
@@ -253,8 +277,13 @@ const IngredientRankingView = React.memo(
 			() =>
 				calculating || comparisonIv === null
 					? { status: "uncalculable" as const }
-					: evaluatePokemonIngredient(comparisonIv, ingredient, parameter),
-			[calculating, comparisonIv, ingredient, parameter],
+					: evaluatePokemonRankingTarget(
+							comparisonIv,
+							rankingTarget,
+							ingredient,
+							parameter,
+						),
+			[calculating, comparisonIv, ingredient, parameter, rankingTarget],
 		);
 		const rankingGroups = React.useMemo(
 			() => groupIngredientRankingEntries(ranking),
@@ -273,6 +302,7 @@ const IngredientRankingView = React.memo(
 			comparison.evaluation.status === "uncalculable"
 				? null
 				: comparison.evaluation.count;
+		const rankingTargetLabel = t(rankingTargetLabelKeys[rankingTarget]);
 		const comparisonRank = comparison.rank;
 		const theoreticalPageCount = Math.ceil(rankingGroups.length / pageSize);
 		const pageCount = Math.max(
@@ -335,22 +365,40 @@ const IngredientRankingView = React.memo(
 						</StyledPokemonButton>
 					</FormControl>
 					<FormControl variant="standard" size="small" required>
-						<InputLabel id="ingredient-ranking-target-label">
-							{t("target ingredient")}
+						<InputLabel id="ingredient-ranking-target-kind-label">
+							{t("ranking target")}
 						</InputLabel>
 						<Select
-							labelId="ingredient-ranking-target-label"
-							value={ingredient}
-							onChange={onIngredientChange}
-							renderValue={renderIngredient}
+							labelId="ingredient-ranking-target-kind-label"
+							value={rankingTarget}
+							onChange={onRankingTargetChange}
 						>
-							{IngredientNames.map((name) => (
-								<MenuItem key={name} value={name}>
-									{renderIngredient(name)}
+							{rankingTargets.map((target) => (
+								<MenuItem key={target} value={target}>
+									{t(rankingTargetLabelKeys[target])}
 								</MenuItem>
 							))}
 						</Select>
 					</FormControl>
+					{rankingTarget === "ingredientCount" && (
+						<FormControl variant="standard" size="small" required>
+							<InputLabel id="ingredient-ranking-target-label">
+								{t("target ingredient")}
+							</InputLabel>
+							<Select
+								labelId="ingredient-ranking-target-label"
+								value={ingredient}
+								onChange={onIngredientChange}
+								renderValue={renderIngredient}
+							>
+								{IngredientNames.map((name) => (
+									<MenuItem key={name} value={name}>
+										{renderIngredient(name)}
+									</MenuItem>
+								))}
+							</Select>
+						</FormControl>
+					)}
 					<TextField
 						variant="standard"
 						size="small"
@@ -423,6 +471,7 @@ const IngredientRankingView = React.memo(
 							name={comparisonName}
 							count={comparisonCount}
 							rank={comparisonRank}
+							valueLabel={rankingTargetLabel}
 							countFormatter={countFormatter}
 							onGoToRankClick={onGoToRankClick}
 						/>
@@ -471,7 +520,7 @@ const IngredientRankingView = React.memo(
 						<span>{t("rank")}</span>
 						<span>{t("pokemon")}</span>
 						<span>{t("ingredient configuration")}</span>
-						<span>{t("expected ingredient count")}</span>
+						<span>{rankingTargetLabel}</span>
 					</StyledHeader>
 					{calculating && (
 						<StyledLoading>
@@ -664,6 +713,7 @@ const ComparisonSummary = React.memo(
 		name,
 		count,
 		rank,
+		valueLabel,
 		countFormatter,
 		onGoToRankClick,
 	}: {
@@ -671,6 +721,7 @@ const ComparisonSummary = React.memo(
 		name: string;
 		count: number | null;
 		rank: number | null;
+		valueLabel: string;
 		countFormatter: Intl.NumberFormat;
 		onGoToRankClick: () => void;
 	}) => {
@@ -683,7 +734,7 @@ const ComparisonSummary = React.memo(
 				</div>
 				<IngredientConfiguration iv={iv} />
 				<div>
-					<strong>{t("comparison expected count")}:</strong>{" "}
+					<strong>{valueLabel}:</strong>{" "}
 					{count === null
 						? t("comparison unavailable")
 						: countFormatter.format(count)}
@@ -751,7 +802,7 @@ const StyledRankingLevelNote = styled("div")({
 const StyledControls = styled("div")({
 	display: "grid",
 	gridTemplateColumns:
-		"minmax(10rem, 1.2fr) minmax(10rem, 1fr) minmax(5rem, .4fr)",
+		"minmax(10rem, 1.2fr) minmax(8rem, .8fr) minmax(10rem, 1fr) minmax(5rem, .4fr)",
 	gap: "1rem",
 	alignItems: "end",
 	marginBottom: ".8rem",
