@@ -55,6 +55,14 @@ export interface IngredientRankingEntry extends IngredientRankingCandidate {
 	ingredientSlots: IngredientSlot[];
 	count: number;
 	metric: IngredientCountMetric;
+	variants: readonly IngredientRankingVariant[];
+}
+
+export interface IngredientRankingVariant {
+	iv: PokemonIv;
+	natureOrder: number;
+	subSkillOrder: number;
+	neutralSubSkillCount: number;
 }
 
 export interface IngredientRankingOptions {
@@ -63,6 +71,7 @@ export interface IngredientRankingOptions {
 	/** Restricts candidates to one exact Pokemon/form name. */
 	pokemonName?: string;
 	level: IngredientRankingLevel;
+	ribbon?: 0 | 1 | 2 | 3 | 4;
 	target?: IngredientRankingTarget;
 	ingredient?: IngredientName;
 	parameter: StrengthParameter;
@@ -76,6 +85,7 @@ export interface IngredientRankingOptions {
 export interface IngredientRankingBaselineOptions {
 	pokemonName: string;
 	level: IngredientRankingLevel;
+	ribbon?: 0 | 1 | 2 | 3 | 4;
 	target?: IngredientRankingTarget;
 	ingredient?: IngredientName;
 	parameter: StrengthParameter;
@@ -128,11 +138,6 @@ const excludedRankingSubSkillNames = new Set<SubSkill["name"]>([
 const rankingSubSkills = SubSkill.allSubSkills.filter(
 	(skill) => !excludedRankingSubSkillNames.has(skill.name),
 );
-const rankingNatures = [
-	new Nature("Serious"),
-	...Nature.allNatures.filter((nature) => !nature.isNeautral),
-];
-
 /**
  * Generate all ingredient-pattern candidates for calculable final evolutions.
  * Calculation-specific exclusions are deliberately left to the ranking step.
@@ -141,6 +146,7 @@ export function generateIngredientRankingCandidates(
 	_baseIv: PokemonIv | undefined,
 	level: IngredientRankingLevel,
 	pokemonName?: string,
+	ribbon: 0 | 1 | 2 | 3 | 4 = 0,
 ): IngredientRankingCandidate[] {
 	if (!Number.isInteger(level) || level < 1 || level > 100) {
 		return [];
@@ -166,6 +172,7 @@ export function generateIngredientRankingCandidates(
 			const props = {
 				pokemonName: pokemon.name,
 				level,
+				ribbon,
 				nature: getNeutralNature(pokemon.name),
 				subSkills: new SubSkillList(),
 				...pattern.props,
@@ -315,6 +322,7 @@ export function createIngredientRankingBaselineIv(
 		undefined,
 		options.level,
 		options.pokemonName,
+		options.ribbon,
 	);
 	const selected = selectBestIngredientCandidates(
 		candidates,
@@ -506,6 +514,7 @@ function createRankingContext(
 				options.baseIv,
 				options.level,
 				options.pokemonName,
+				options.ribbon,
 			)
 		: (optionsOrCandidates as readonly IngredientRankingCandidate[]);
 	const targetIngredient = options?.ingredient ?? ingredient;
@@ -534,13 +543,15 @@ function createRankingContext(
 
 interface CandidateEvaluationState {
 	entriesByCount: Map<number, IngredientRankingEntry>;
-	metricCache: Set<string> | null;
+	variantsByCount: Map<number, IngredientRankingVariant[]>;
+	metricCache: Map<string, IngredientCountMetric | null> | null;
 }
 
 type SubSkillCombination = {
 	subSkills: SubSkillList;
 	skills: SubSkill[];
 	order: number;
+	neutralSubSkillCount: number;
 };
 
 function evaluateSelectedCandidate(
@@ -548,20 +559,14 @@ function evaluateSelectedCandidate(
 	context: IngredientRankingContext,
 ): IngredientRankingEntry[] {
 	const state = createCandidateEvaluationState(context);
-	evaluateBaselineCandidate(state, selected, context);
-
-	for (const [natureOrder, nature] of rankingNatures.entries()) {
-		const normalizedNature = normalizeNatureForCache(
-			selected,
-			nature,
-			state.metricCache,
-		);
-		for (const combination of generateSubSkillCombinations(selected.iv.level)) {
+	for (const [natureOrder, nature] of getRankingNatures(selected)) {
+		for (const combination of generateIngredientRankingSubSkillCombinations(
+			selected.iv.level,
+		)) {
 			evaluateCandidateCombination(
 				state,
 				selected,
 				nature,
-				normalizedNature,
 				natureOrder,
 				combination,
 				context,
@@ -579,20 +584,15 @@ async function evaluateSelectedCandidateAsync(
 ): Promise<IngredientRankingEntry[]> {
 	const state = createCandidateEvaluationState(context);
 	let iteration = 0;
-	evaluateBaselineCandidate(state, selected, context);
 
-	for (const [natureOrder, nature] of rankingNatures.entries()) {
-		const normalizedNature = normalizeNatureForCache(
-			selected,
-			nature,
-			state.metricCache,
-		);
-		for (const combination of generateSubSkillCombinations(selected.iv.level)) {
+	for (const [natureOrder, nature] of getRankingNatures(selected)) {
+		for (const combination of generateIngredientRankingSubSkillCombinations(
+			selected.iv.level,
+		)) {
 			evaluateCandidateCombination(
 				state,
 				selected,
 				nature,
-				normalizedNature,
 				natureOrder,
 				combination,
 				context,
@@ -613,54 +613,22 @@ function createCandidateEvaluationState(
 ): CandidateEvaluationState {
 	return {
 		entriesByCount: new Map(),
+		variantsByCount: new Map(),
 		metricCache:
 			context.calculator === defaultStrengthCalculator
-				? new Set<string>()
+				? new Map<string, IngredientCountMetric | null>()
 				: null,
 	};
-}
-
-function evaluateBaselineCandidate(
-	state: CandidateEvaluationState,
-	selected: IngredientRankingCandidate,
-	context: IngredientRankingContext,
-): void {
-	const nature = getNeutralNature(selected.iv.pokemonName);
-	evaluateCandidateCombination(
-		state,
-		selected,
-		nature,
-		nature,
-		0,
-		{
-			subSkills: new SubSkillList(),
-			skills: [],
-			order: -1,
-		},
-		context,
-	);
 }
 
 function evaluateCandidateCombination(
 	state: CandidateEvaluationState,
 	selected: IngredientRankingCandidate,
 	nature: Nature,
-	normalizedNature: Nature,
 	natureOrder: number,
 	combination: SubSkillCombination,
 	context: IngredientRankingContext,
 ): void {
-	const cacheKey =
-		state.metricCache &&
-		getIngredientCalculationCacheKey(normalizedNature, combination.skills);
-	if (
-		cacheKey !== null &&
-		cacheKey !== undefined &&
-		state.metricCache?.has(cacheKey)
-	) {
-		return;
-	}
-
 	const iv = new PokemonIv({
 		...selected.iv.toProps(),
 		nature,
@@ -672,40 +640,55 @@ function evaluateCandidateCombination(
 		natureOrder,
 		subSkillOrder: combination.order,
 	};
-	const metric = calculateIngredientRankingMetric(
-		candidate,
-		context.target,
-		context.ingredient,
-		context.parameter,
-		context.calculator,
+	const cacheKey = getIngredientCalculationCacheKey(
+		iv.nature,
+		combination.skills,
 	);
-	if (cacheKey !== null && cacheKey !== undefined) {
-		state.metricCache?.add(cacheKey);
+	let metric: IngredientCountMetric | null;
+	if (state.metricCache === null) {
+		metric = calculateIngredientRankingMetric(
+			candidate,
+			context.target,
+			context.ingredient,
+			context.parameter,
+			context.calculator,
+		);
+	} else if (state.metricCache.has(cacheKey)) {
+		metric = state.metricCache.get(cacheKey) ?? null;
+	} else {
+		metric = calculateIngredientRankingMetric(
+			candidate,
+			context.target,
+			context.ingredient,
+			context.parameter,
+			context.calculator,
+		);
+		state.metricCache.set(cacheKey, metric);
 	}
-	if (metric === null || state.entriesByCount.has(metric.count)) {
+	if (metric === null) {
 		return;
 	}
+	const variant: IngredientRankingVariant = {
+		iv,
+		natureOrder,
+		subSkillOrder: combination.order,
+		neutralSubSkillCount: combination.neutralSubSkillCount,
+	};
+	const current = state.entriesByCount.get(metric.count);
+	if (current !== undefined) {
+		state.variantsByCount.get(metric.count)?.push(variant);
+		return;
+	}
+	const variants = [variant];
+	state.variantsByCount.set(metric.count, variants);
 	state.entriesByCount.set(metric.count, {
 		...candidate,
 		pokemon: iv.pokemon,
 		ingredientSlots: getIngredientSlots(iv),
 		count: metric.count,
 		metric,
+		variants,
 	});
-}
-
-function normalizeNatureForCache(
-	selected: IngredientRankingCandidate,
-	nature: Nature,
-	metricCache: Set<string> | null,
-): Nature {
-	return metricCache === null
-		? nature
-		: new PokemonIv({
-				...selected.iv.toProps(),
-				nature,
-				subSkills: new SubSkillList(),
-			}).nature;
 }
 
 function finalizeRankingEntries(
@@ -881,38 +864,68 @@ function getRankingTargetValue(
 	}
 }
 
-function* generateSubSkillCombinations(
+export function* generateIngredientRankingSubSkillCombinations(
 	level: number,
 ): Generator<SubSkillCombination> {
-	const count = level < 10 ? 0 : level < 25 ? 1 : level < 50 ? 2 : 3;
+	const slotCount =
+		level < 10
+			? 0
+			: level < 25
+				? 1
+				: level < 50
+					? 2
+					: level < 75
+						? 3
+						: level < 100
+							? 4
+							: 5;
 	const skills = rankingSubSkills;
 	const selected: SubSkill[] = [];
 	let order = 0;
 
-	function* visit(start: number): Generator<SubSkill[]> {
+	function* visit(start: number, count: number): Generator<SubSkill[]> {
 		if (selected.length === count) {
 			yield [...selected];
 			return;
 		}
 		for (let index = start; index < skills.length; index += 1) {
 			selected.push(skills[index]);
-			yield* visit(index + 1);
+			yield* visit(index + 1, count);
 			selected.pop();
 		}
 	}
 
-	for (const combination of visit(0)) {
-		yield {
-			subSkills: new SubSkillList({
-				lv10: combination[0],
-				lv25: combination[1],
-				lv50: combination[2],
-			}),
-			skills: combination,
-			order,
-		};
-		order += 1;
+	for (let activeCount = 0; activeCount <= slotCount; activeCount += 1) {
+		for (const combination of visit(0, activeCount)) {
+			yield {
+				subSkills: new SubSkillList({
+					lv10: combination[0],
+					lv25: combination[1],
+					lv50: combination[2],
+					lv75: combination[3],
+					lv100: combination[4],
+				}),
+				skills: combination,
+				order,
+				neutralSubSkillCount: slotCount - activeCount,
+			};
+			order += 1;
+		}
 	}
+}
+
+function getRankingNatures(
+	selected: IngredientRankingCandidate,
+): Array<[number, Nature]> {
+	return Nature.allNatures.flatMap((nature, natureOrder) => {
+		if (
+			(selected.iv.pokemon.form === "Amped" && !nature.isAmped) ||
+			(selected.iv.pokemon.form === "Low Key" && !nature.isLowKey)
+		) {
+			return [];
+		}
+		return [[natureOrder, nature]];
+	});
 }
 
 function getIngredientCalculationCacheKey(

@@ -37,6 +37,10 @@ import TapFrequencyControl from "./TapFrequencyControl";
 const StyledSettingForm = styled("div")({
 	padding: "0 1rem",
 	marginBottom: "10rem",
+	"&.compact": {
+		padding: 0,
+		marginBottom: 0,
+	},
 	"& section": {
 		margin: "0.2rem 0",
 		fontSize: ".9rem",
@@ -73,10 +77,12 @@ const StrengthSettingForm = React.memo(
 		dispatch,
 		value,
 		hasHelpingBonus,
+		compact = false,
 	}: {
 		dispatch: React.Dispatch<IvAction>;
 		value: StrengthParameter;
 		hasHelpingBonus: boolean;
+		compact?: boolean;
 	}) => {
 		const { t } = useTranslation();
 		const [pityProcHelpOpen, setPityProcHelpOpen] = React.useState(false);
@@ -208,7 +214,7 @@ const StrengthSettingForm = React.memo(
 
 		const isNotWhistle = value.period !== whistlePeriod;
 		return (
-			<StyledSettingForm>
+			<StyledSettingForm className={compact ? "compact" : undefined}>
 				<section>
 					<span className="lbl">{t("period")}:</span>
 					<PeriodSelect dispatch={dispatch} value={value} />

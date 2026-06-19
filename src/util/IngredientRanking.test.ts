@@ -8,6 +8,7 @@ import {
 	evaluatePokemonIngredient,
 	evaluatePokemonRankingTarget,
 	generateIngredientRankingCandidates,
+	generateIngredientRankingSubSkillCombinations,
 	groupIngredientRankingEntries,
 	type IngredientRankingCandidate,
 	type IngredientRankingEntry,
@@ -88,6 +89,20 @@ describe("generateIngredientRankingCandidates", () => {
 		});
 
 		expect(first.map(summarize)).toEqual(second.map(summarize));
+	});
+
+	test("applies ribbon to generated candidates", () => {
+		const candidates = generateIngredientRankingCandidates(
+			undefined,
+			75,
+			"Venusaur",
+			4,
+		);
+
+		expect(candidates).not.toHaveLength(0);
+		expect(candidates.every((candidate) => candidate.iv.ribbon === 4)).toBe(
+			true,
+		);
 	});
 
 	test("generates candidates for only the requested final Pokemon/form", () => {
@@ -388,6 +403,7 @@ describe("comparison calculation layer", () => {
 		const iv = createIngredientRankingBaselineIv({
 			pokemonName: "Skeledirge",
 			level: 60,
+			ribbon: 3,
 			ingredient: "apple",
 			parameter,
 			strengthCalculator: (candidate) =>
@@ -402,6 +418,7 @@ describe("comparison calculation layer", () => {
 		expect(iv?.pokemonName).toBe("Skeledirge");
 		expect(iv?.level).toBe(60);
 		expect(iv?.ingredient).toBe("ABC");
+		expect(iv?.ribbon).toBe(3);
 		expect(iv?.nature.name).toBe("Serious");
 		expect(iv?.activeSubSkills).toEqual([]);
 	});
@@ -663,15 +680,24 @@ describe("calculateIngredientRanking", () => {
 
 		expect(result).toHaveLength(1);
 		expect(result[0].iv.pokemonName).toBe("Skeledirge");
-		expect(calculator).toHaveBeenCalledTimes(6 + 1 + 21);
+		expect(calculator).toHaveBeenCalledTimes(6 + 25);
 	});
 
 	test.each([
-		{ pokemonName: "Toxtricity (Amped)", baselineNature: "Hardy" },
-		{ pokemonName: "Toxtricity (Low Key)", baselineNature: "Serious" },
+		{
+			pokemonName: "Toxtricity (Amped)",
+			baselineNature: "Hardy",
+			natureCount: 13,
+		},
+		{
+			pokemonName: "Toxtricity (Low Key)",
+			baselineNature: "Bashful",
+			natureCount: 12,
+		},
 	])("keeps $pokemonName results separate with its neutral baseline", ({
 		pokemonName,
 		baselineNature,
+		natureCount,
 	}) => {
 		const calculatedPokemonNames = new Set<string>();
 		const result = calculateIngredientRanking({
@@ -690,6 +716,14 @@ describe("calculateIngredientRanking", () => {
 		expect(result[0].iv.pokemonName).toBe(pokemonName);
 		expect(result[0].iv.nature.name).toBe(baselineNature);
 		expect(result[0].iv.activeSubSkills).toEqual([]);
+		expect(result[0].variants).toHaveLength(natureCount);
+		expect(
+			result[0].variants.every(({ iv }) =>
+				pokemonName.endsWith("(Amped)")
+					? iv.nature.isAmped
+					: iv.nature.isLowKey,
+			),
+		).toBe(true);
 	});
 
 	test("returns no ranking when the Pokemon has no target ingredient", () => {
@@ -764,7 +798,23 @@ describe("calculateIngredientRanking", () => {
 		expect(result[0].ingredientKey).toBe("egg/herb/tail");
 	});
 
-	test("evaluates 21 ranking natures with neutral natures collapsed to Serious", () => {
+	test("applies the options ribbon to every ranking variant", () => {
+		const result = calculateIngredientRanking({
+			pokemonName: "Venusaur",
+			level: 9,
+			ribbon: 2,
+			ingredient: "honey",
+			parameter,
+			strengthCalculator: () => strengthResult([{ name: "honey", count: 10 }]),
+		});
+
+		expect(result).toHaveLength(1);
+		expect(result[0].iv.ribbon).toBe(2);
+		expect(result[0].variants).toHaveLength(25);
+		expect(result[0].variants.every(({ iv }) => iv.ribbon === 2)).toBe(true);
+	});
+
+	test("keeps every compatible nature in stable order", () => {
 		const evaluatedNatures: string[] = [];
 		let calls = 0;
 		const calculator: IngredientRankingStrengthCalculator = (iv) => {
@@ -782,44 +832,36 @@ describe("calculateIngredientRanking", () => {
 			calculator,
 		);
 
-		expect(calls).toBe(1 + 1 + 21);
-		expect(evaluatedNatures[0]).toBe("Serious");
-		expect(evaluatedNatures.slice(1)).toEqual([
-			"Serious",
-			...Nature.allNatures
-				.filter((nature) => !nature.isNeautral)
-				.map((nature) => nature.name),
-		]);
+		expect(calls).toBe(1 + 25);
+		expect(evaluatedNatures).toEqual(
+			Nature.allNatures.map((nature) => nature.name),
+		);
 	});
 
 	test.each([
-		{ level: 9, combinations: 1 },
-		{ level: 10, combinations: 12 },
-		{ level: 25, combinations: 66 },
-		{ level: 50, combinations: 220 },
-	])("evaluates canonical sub-skill combinations at level $level", ({
+		{ level: 9, slotCount: 0, combinations: 1 },
+		{ level: 10, slotCount: 1, combinations: 13 },
+		{ level: 25, slotCount: 2, combinations: 79 },
+		{ level: 50, slotCount: 3, combinations: 299 },
+		{ level: 75, slotCount: 4, combinations: 794 },
+		{ level: 100, slotCount: 5, combinations: 1586 },
+	])("generates canonical sub-skill combinations at level $level", ({
 		level,
+		slotCount,
 		combinations,
 	}) => {
-		const evaluated = new Set<string>();
-		let calls = 0;
-		const calculator: IngredientRankingStrengthCalculator = (iv) => {
-			calls += 1;
-			if (calls > 1) {
-				evaluated.add(iv.activeSubSkills.map((skill) => skill.name).join("/"));
-			}
-			return strengthResult([{ name: "honey", count: 10 }]);
-		};
-
-		calculateIngredientRanking(
-			[candidateFor("Venusaur", "AAA", level)],
-			"honey",
-			parameter,
-			calculator,
+		const generated = [...generateIngredientRankingSubSkillCombinations(level)];
+		const signatures = generated.map((combination) =>
+			combination.skills.map((skill) => skill.name).join("/"),
 		);
 
-		expect(calls).toBe(1 + 1 + 21 * combinations);
-		expect(evaluated.size).toBe(level < 10 ? 1 : combinations + 1);
+		expect(generated).toHaveLength(combinations);
+		expect(new Set(signatures)).toHaveLength(combinations);
+		expect(generated[0].neutralSubSkillCount).toBe(slotCount);
+		expect(generated.at(-1)?.skills).toHaveLength(slotCount);
+		expect(generated.at(-1)?.neutralSubSkillCount).toBe(0);
+		expect(generated.at(-1)?.subSkills.lv75 === null).toBe(slotCount < 4);
+		expect(generated.at(-1)?.subSkills.lv100 === null).toBe(slotCount < 5);
 	});
 
 	test("does not inherit nature or sub-skills from the current IV", () => {
@@ -844,13 +886,13 @@ describe("calculateIngredientRanking", () => {
 
 		expect(evaluated[0].nature.isNeautral).toBe(true);
 		expect(evaluated[0].activeSubSkills).toEqual([]);
-		expect(evaluated[1].nature.name).toBe("Serious");
+		expect(evaluated[1].nature.name).toBe("Bashful");
 		expect(evaluated[1].activeSubSkills).toEqual([]);
-		expect(evaluated[2].nature.name).toBe("Serious");
+		expect(evaluated[2].nature.name).toBe("Bashful");
 		expect(evaluated[2].activeSubSkills[0].name).toBe("Berry Finding S");
 	});
 
-	test("collapses exact equal counts to the first stable representative", () => {
+	test("keeps all equal variants behind the first stable representative", () => {
 		const result = calculateIngredientRanking(
 			[candidateFor("Venusaur", "AAA", 10)],
 			"honey",
@@ -859,11 +901,18 @@ describe("calculateIngredientRanking", () => {
 		);
 
 		expect(result).toHaveLength(1);
-		expect(result[0].iv.nature.name).toBe("Serious");
+		expect(result[0].iv).toBe(result[0].variants[0].iv);
+		expect(result[0].iv.nature.name).toBe("Bashful");
 		expect(result[0].iv.activeSubSkills).toEqual([]);
+		expect(result[0].variants).toHaveLength(25 * 13);
+		expect(result[0].variants[0]).toMatchObject({
+			natureOrder: 0,
+			subSkillOrder: 0,
+			neutralSubSkillCount: 1,
+		});
 	});
 
-	test("includes the Serious no-subskill baseline as a ranking candidate", () => {
+	test("includes every no-subskill nature as a ranking variant", () => {
 		const result = calculateIngredientRanking(
 			[candidateFor("Venusaur", "AAA", 10)],
 			"honey",
@@ -878,8 +927,37 @@ describe("calculateIngredientRanking", () => {
 		);
 		const baseline = result.find((entry) => entry.count === 1);
 
-		expect(baseline?.iv.nature.name).toBe("Serious");
+		expect(baseline?.iv.nature.name).toBe("Bashful");
 		expect(baseline?.iv.activeSubSkills).toEqual([]);
+		expect(
+			baseline?.variants.map((variant) => variant.iv.nature.name),
+		).toContain("Serious");
+	});
+
+	test("represents multiple neutral slots without duplicating skill order", () => {
+		const result = calculateIngredientRanking(
+			[candidateFor("Venusaur", "AAA", 25)],
+			"honey",
+			parameter,
+			() => strengthResult([{ name: "honey", count: 10 }]),
+		);
+		const variants = result[0].variants.filter(
+			(variant) => variant.iv.nature.name === "Bashful",
+		);
+
+		expect(variants).toHaveLength(79);
+		expect(variants[0].iv.activeSubSkills).toEqual([]);
+		expect(variants[0].neutralSubSkillCount).toBe(2);
+		expect(
+			variants.some(
+				(variant) =>
+					variant.iv.activeSubSkills.length === 1 &&
+					variant.neutralSubSkillCount === 1,
+			),
+		).toBe(true);
+		expect(variants.at(-1)?.iv.activeSubSkills).toHaveLength(2);
+		expect(variants.at(-1)?.iv.subSkills.lv25).not.toBeNull();
+		expect(variants.at(-1)?.neutralSubSkillCount).toBe(0);
 	});
 
 	test("uses only the 12 ingredient-ranking sub-skills at level 60", () => {
@@ -917,12 +995,15 @@ describe("calculateIngredientRanking", () => {
 		expect(
 			[...evaluated].some((value) => value.includes("Energy Recovery Bonus")),
 		).toBe(true);
-		expect(calls).toBe(6 + 1 + 21 * 220);
+		expect(calls).toBe(6 + 25 * 299);
 	});
 
 	test("default-calculator cache preserves distinct counts and representatives", () => {
 		const candidate = candidateFor("Venusaur", "AAA", 10);
+		const calculateSpy = vi.spyOn(PokemonStrength.prototype, "calculate");
 		const cached = calculateIngredientRanking([candidate], "honey", parameter);
+		const cachedCalls = calculateSpy.mock.calls.length;
+		calculateSpy.mockRestore();
 		const uncached = calculateIngredientRanking(
 			[candidate],
 			"honey",
@@ -934,9 +1015,19 @@ describe("calculateIngredientRanking", () => {
 			count: entry.count,
 			nature: entry.iv.nature.name,
 			subSkills: entry.iv.activeSubSkills.map((skill) => skill.name),
+			variants: entry.variants.map((variant) => ({
+				nature: variant.iv.nature.name,
+				subSkills: variant.iv.activeSubSkills.map((skill) => skill.name),
+				natureOrder: variant.natureOrder,
+				subSkillOrder: variant.subSkillOrder,
+				neutralSubSkillCount: variant.neutralSubSkillCount,
+			})),
 		});
 
 		expect(cached.length).toBeGreaterThan(1);
+		expect(cachedCalls).toBeLessThan(
+			1 + cached.reduce((sum, entry) => sum + entry.variants.length, 0),
+		);
 		expect(cached.map(summarize)).toEqual(uncached.map(summarize));
 	});
 
@@ -1138,7 +1229,7 @@ describe("calculateIngredientRanking", () => {
 		);
 
 		expect(fixedLevelParameter.level).toBe(10);
-		expect(calculator).toHaveBeenCalledTimes(23);
+		expect(calculator).toHaveBeenCalledTimes(26);
 	});
 
 	test("excludes candidates that cannot be calculated", () => {
@@ -1232,6 +1323,14 @@ function makeEntry(
 		],
 		count,
 		metric: { count },
+		variants: [
+			{
+				iv: candidate.iv,
+				natureOrder: candidate.natureOrder ?? 0,
+				subSkillOrder: candidate.subSkillOrder ?? 0,
+				neutralSubSkillCount: 0,
+			},
+		],
 	};
 }
 

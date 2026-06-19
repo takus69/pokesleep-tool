@@ -2,6 +2,7 @@ import {
 	Button,
 	CircularProgress,
 	Dialog,
+	DialogActions,
 	DialogContent,
 	DialogTitle,
 	FormControl,
@@ -36,9 +37,11 @@ import IngredientIcon from "./IngredientIcon";
 import IvForm from "./IvForm/IvForm";
 import PokemonSelectDialog from "./IvForm/PokemonSelectDialog";
 import type { PokemonOption } from "./IvForm/PokemonTextField";
+import SleepingTimeControl from "./IvForm/SleepingTimeControl";
 import type IvState from "./IvState";
 import type { IvAction } from "./IvState";
 import PokemonIcon from "./PokemonIcon";
+import StrengthSettingForm from "./Strength/StrengthParameterForm";
 import StrengthParameterSummary from "./Strength/StrengthParameterSummary";
 
 const pageSize = 100;
@@ -72,6 +75,7 @@ const IngredientRankingView = React.memo(
 			React.useState<IngredientRankingTarget>("ingredientCount");
 		const [ingredient, setIngredient] = React.useState<IngredientName>("apple");
 		const [level, setLevel] = React.useState(60);
+		const [ribbon, setRibbon] = React.useState<0 | 1 | 2 | 3 | 4>(0);
 		const [ranking, setRanking] = React.useState<IngredientRankingEntry[]>([]);
 		const [calculating, setCalculating] = React.useState(true);
 		const [page, setPage] = React.useState(1);
@@ -82,6 +86,8 @@ const IngredientRankingView = React.memo(
 			() => new PokemonIv({ pokemonName: "Skeledirge", level: 60 }),
 		);
 		const [manualDialogOpen, setManualDialogOpen] = React.useState(false);
+		const [detailedSettingsOpen, setDetailedSettingsOpen] =
+			React.useState(false);
 		const [registeredId, setRegisteredId] = React.useState<number | "">("");
 		const resetComparisonRef = React.useRef(true);
 
@@ -119,6 +125,7 @@ const IngredientRankingView = React.memo(
 				target: rankingTarget,
 				ingredient,
 				level,
+				ribbon,
 				parameter,
 				signal: controller.signal,
 			})
@@ -143,7 +150,7 @@ const IngredientRankingView = React.memo(
 				active = false;
 				controller.abort();
 			};
-		}, [ingredient, level, parameter, pokemonName, rankingTarget]);
+		}, [ingredient, level, parameter, pokemonName, rankingTarget, ribbon]);
 
 		const onPokemonButtonClick = React.useCallback(() => {
 			setPokemonDialogOpen(true);
@@ -187,6 +194,10 @@ const IngredientRankingView = React.memo(
 			},
 			[],
 		);
+		const onRibbonChange = React.useCallback((value: 0 | 1 | 2 | 3 | 4) => {
+			setRibbon(value);
+			setPage(1);
+		}, []);
 		const onPageChange = React.useCallback(
 			(_event: React.ChangeEvent<unknown>, value: number) => {
 				setPage(value);
@@ -247,9 +258,10 @@ const IngredientRankingView = React.memo(
 					level,
 					target: rankingTarget,
 					ingredient,
+					ribbon,
 					parameter,
 				}),
-			[ingredient, level, parameter, pokemonName, rankingTarget],
+			[ingredient, level, parameter, pokemonName, rankingTarget, ribbon],
 		);
 		React.useEffect(() => {
 			if (resetComparisonRef.current && baselineIv !== null) {
@@ -328,8 +340,11 @@ const IngredientRankingView = React.memo(
 			}
 		}, [comparison.page]);
 		const onDetailedSettingsClick = React.useCallback(() => {
-			dispatch({ type: "changeLowerTab", payload: { index: 2 } });
-		}, [dispatch]);
+			setDetailedSettingsOpen(true);
+		}, []);
+		const onDetailedSettingsClose = React.useCallback(() => {
+			setDetailedSettingsOpen(false);
+		}, []);
 
 		return (
 			<StyledRanking>
@@ -409,7 +424,30 @@ const IngredientRankingView = React.memo(
 						onChange={onLevelChange}
 						slotProps={{ htmlInput: { min: 1, max: 100, step: 1 } }}
 					/>
+					<StyledSleepingTimeControl>
+						<FormLabel>{t("sleeping time shared")}</FormLabel>
+						<SleepingTimeControl value={ribbon} onChange={onRibbonChange} />
+					</StyledSleepingTimeControl>
 				</StyledControls>
+				<Dialog
+					fullWidth
+					maxWidth="sm"
+					open={detailedSettingsOpen}
+					onClose={onDetailedSettingsClose}
+				>
+					<DialogTitle>{t("detailed settings")}</DialogTitle>
+					<DialogContent>
+						<StrengthSettingForm
+							value={parameter}
+							hasHelpingBonus={state.pokemonIv.hasHelpingBonusInActiveSubSkills}
+							dispatch={dispatch}
+							compact
+						/>
+					</DialogContent>
+					<DialogActions>
+						<Button onClick={onDetailedSettingsClose}>{t("close")}</Button>
+					</DialogActions>
+				</Dialog>
 				<PokemonSelectDialog
 					open={pokemonDialogOpen}
 					shiny={false}
@@ -553,7 +591,7 @@ const IngredientRankingView = React.memo(
 							rows.push(
 								...group.entries.map((result) => (
 									<RankingRow
-										key={`${result.pokemon.id}-${result.iv.form}-${result.ordinal}-${result.natureOrder}-${result.subSkillOrder}`}
+										key={`${result.pokemon.id}-${result.iv.form}-${result.ordinal}-${result.natureOrder}-${result.subSkillOrder}-${result.count}-${result.variants.length}`}
 										result={result}
 										rank={rank}
 										countFormatter={countFormatter}
@@ -598,17 +636,78 @@ const RankingRow = React.memo(
 		result: IngredientRankingEntry;
 		rank: number;
 		countFormatter: Intl.NumberFormat;
-	}) => (
-		<StyledRow>
-			<strong>{rank}</strong>
-			<PokemonSummary
-				iv={result.iv}
-				nameKey={`pokemons.${result.pokemon.name}`}
-			/>
-			<IngredientConfiguration iv={result.iv} />
-			<StyledCount>{countFormatter.format(result.count)}</StyledCount>
-		</StyledRow>
-	),
+	}) => {
+		const { t } = useTranslation();
+		const [selectedVariantIndex, setSelectedVariantIndex] = React.useState(0);
+		const variantIndex = Math.min(
+			selectedVariantIndex,
+			Math.max(result.variants.length - 1, 0),
+		);
+		const selectedVariant = result.variants[variantIndex] ?? result.variants[0];
+		const selectedIv = selectedVariant?.iv ?? result.iv;
+
+		return (
+			<StyledRow>
+				<strong>{rank}</strong>
+				<PokemonSummary
+					iv={selectedIv}
+					nameKey={`pokemons.${result.pokemon.name}`}
+					neutralSubSkillCount={selectedVariant?.neutralSubSkillCount ?? 0}
+					traitSelector={
+						result.variants.length > 1 ? (
+							<StyledVariantSelect
+								variant="standard"
+								size="small"
+								value={variantIndex}
+								onChange={(event) => {
+									setSelectedVariantIndex(Number(event.target.value));
+								}}
+								aria-label={t("ranking equivalent variants")}
+								renderValue={(value) =>
+									t("ranking variant label", {
+										current: Number(value) + 1,
+										count: result.variants.length,
+									})
+								}
+							>
+								{result.variants.map((variant, index) => (
+									<MenuItem
+										key={`${variant.natureOrder}-${variant.subSkillOrder}-${variant.neutralSubSkillCount}`}
+										value={index}
+									>
+										<RankingVariantOption variant={variant} />
+									</MenuItem>
+								))}
+							</StyledVariantSelect>
+						) : undefined
+					}
+				/>
+				<IngredientConfiguration iv={result.iv} />
+				<StyledCount>{countFormatter.format(result.count)}</StyledCount>
+			</StyledRow>
+		);
+	},
+);
+
+const RankingVariantOption = React.memo(
+	({ variant }: { variant: IngredientRankingEntry["variants"][number] }) => {
+		const { t } = useTranslation();
+		const subSkillNames = variant.iv.activeSubSkills.map((subSkill) =>
+			t(`subskill.${subSkill.name}`),
+		);
+		if (variant.neutralSubSkillCount > 0) {
+			subSkillNames.push(
+				`${t("neutral subskill")} ×${variant.neutralSubSkillCount}`,
+			);
+		}
+
+		return (
+			<StyledVariantOption>
+				<strong>{t(`natures.${variant.iv.nature.name}`)}</strong>
+				<span>{subSkillNames.join(" / ") || "-"}</span>
+			</StyledVariantOption>
+		);
+	},
 );
 
 const ComparisonRow = React.memo(
@@ -646,10 +745,14 @@ const PokemonSummary = React.memo(
 		iv,
 		name,
 		nameKey,
+		neutralSubSkillCount = 0,
+		traitSelector,
 	}: {
 		iv: PokemonIv;
 		name?: string;
 		nameKey?: string;
+		neutralSubSkillCount?: number;
+		traitSelector?: React.ReactNode;
 	}) => {
 		const { t } = useTranslation();
 		return (
@@ -659,41 +762,52 @@ const PokemonSummary = React.memo(
 					<StyledPokemonName>
 						{name ?? (nameKey === undefined ? "" : t(nameKey))}
 					</StyledPokemonName>
-					<AppliedTraits iv={iv} />
+					{traitSelector}
+					<AppliedTraits iv={iv} neutralSubSkillCount={neutralSubSkillCount} />
 				</StyledPokemonSummary>
 			</StyledPokemon>
 		);
 	},
 );
 
-const AppliedTraits = React.memo(({ iv }: { iv: PokemonIv }) => {
-	const { t } = useTranslation();
-	return (
-		<StyledAppliedTraits>
-			<span>
-				<StyledTraitLabel>{t("sub skills")}:</StyledTraitLabel>
-				{iv.activeSubSkills.length > 0
-					? iv.activeSubSkills
-							.map((subSkill) => t(`subskill.${subSkill.name}`))
-							.join(" / ")
-					: "-"}
-			</span>
-			<span>
-				<StyledTraitLabel>{t("nature")}:</StyledTraitLabel>
-				{iv.nature.upEffect === "No effect" ? (
-					t("nature effect.No effect")
-				) : (
-					<>
-						<StyledNatureUp>UP</StyledNatureUp>
-						{t(`nature effect.${iv.nature.upEffect}`)}{" "}
-						<StyledNatureDown>DOWN</StyledNatureDown>
-						{t(`nature effect.${iv.nature.downEffect}`)}
-					</>
-				)}
-			</span>
-		</StyledAppliedTraits>
-	);
-});
+const AppliedTraits = React.memo(
+	({
+		iv,
+		neutralSubSkillCount = 0,
+	}: {
+		iv: PokemonIv;
+		neutralSubSkillCount?: number;
+	}) => {
+		const { t } = useTranslation();
+		const subSkillNames = iv.activeSubSkills.map((subSkill) =>
+			t(`subskill.${subSkill.name}`),
+		);
+		if (neutralSubSkillCount > 0) {
+			subSkillNames.push(`${t("neutral subskill")} ×${neutralSubSkillCount}`);
+		}
+		return (
+			<StyledAppliedTraits>
+				<span>
+					<StyledTraitLabel>{t("sub skills")}:</StyledTraitLabel>
+					{subSkillNames.join(" / ") || "-"}
+				</span>
+				<span>
+					<StyledTraitLabel>{t("nature")}:</StyledTraitLabel>
+					{iv.nature.upEffect === "No effect" ? (
+						t("nature effect.No effect")
+					) : (
+						<>
+							<StyledNatureUp>UP</StyledNatureUp>
+							{t(`nature effect.${iv.nature.upEffect}`)}{" "}
+							<StyledNatureDown>DOWN</StyledNatureDown>
+							{t(`nature effect.${iv.nature.downEffect}`)}
+						</>
+					)}
+				</span>
+			</StyledAppliedTraits>
+		);
+	},
+);
 
 const IngredientConfiguration = React.memo(({ iv }: { iv: PokemonIv }) => (
 	<StyledIngredients>
@@ -802,7 +916,7 @@ const StyledRankingLevelNote = styled("div")({
 const StyledControls = styled("div")({
 	display: "grid",
 	gridTemplateColumns:
-		"minmax(10rem, 1.2fr) minmax(8rem, .8fr) minmax(10rem, 1fr) minmax(5rem, .4fr)",
+		"minmax(10rem, 1.2fr) minmax(8rem, .8fr) minmax(10rem, 1fr) minmax(5rem, .4fr) minmax(8rem, .7fr)",
 	gap: "1rem",
 	alignItems: "end",
 	marginBottom: ".8rem",
@@ -814,6 +928,19 @@ const StyledControls = styled("div")({
 		"& > div:first-of-type": {
 			gridColumn: "1 / -1",
 		},
+	},
+});
+
+const StyledSleepingTimeControl = styled(FormControl)({
+	minWidth: 0,
+	"& > label": {
+		marginBottom: ".15rem",
+		fontSize: ".75rem",
+		lineHeight: 1,
+	},
+	"& .MuiInputBase-root": {
+		minWidth: 0,
+		maxWidth: "100%",
 	},
 });
 
@@ -979,6 +1106,32 @@ const StyledPokemonName = styled("span")({
 	overflow: "hidden",
 	textOverflow: "ellipsis",
 	whiteSpace: "nowrap",
+});
+
+const StyledVariantSelect = styled(Select)({
+	width: "min(100%, 12rem)",
+	minWidth: 0,
+	fontSize: ".68rem",
+	"& .MuiSelect-select": {
+		overflow: "hidden",
+		paddingTop: ".1rem",
+		paddingBottom: ".1rem",
+		textOverflow: "ellipsis",
+		whiteSpace: "nowrap",
+	},
+	"@media (max-width: 600px)": {
+		width: "100%",
+	},
+});
+
+const StyledVariantOption = styled("span")({
+	display: "flex",
+	flexDirection: "column",
+	maxWidth: "min(28rem, 75vw)",
+	fontSize: ".75rem",
+	lineHeight: 1.3,
+	whiteSpace: "normal",
+	wordBreak: "break-word",
 });
 
 const StyledAppliedTraits = styled("div")({
