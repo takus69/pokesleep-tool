@@ -379,6 +379,7 @@ function calculateBaseFreqAndBonus(
 		param.isGoodCampTicketSet,
 		isMainBerry,
 		isNonFavoriteBerry,
+		param.fieldIndex,
 	);
 	const inventoryBonus = {
 		berry: bonus.berry,

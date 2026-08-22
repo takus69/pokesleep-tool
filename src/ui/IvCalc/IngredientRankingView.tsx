@@ -439,6 +439,7 @@ const IngredientRankingView = React.memo(
 					<DialogContent>
 						<StrengthSettingForm
 							value={parameter}
+							items={state.box.items}
 							hasHelpingBonus={state.pokemonIv.hasHelpingBonusInActiveSubSkills}
 							dispatch={dispatch}
 							compact

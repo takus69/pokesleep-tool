@@ -874,9 +874,9 @@ export function* generateIngredientRankingSubSkillCombinations(
 				? 1
 				: level < 50
 					? 2
-					: level < 75
+					: level < 70
 						? 3
-						: level < 100
+						: level < 80
 							? 4
 							: 5;
 	const skills = rankingSubSkills;
@@ -902,8 +902,8 @@ export function* generateIngredientRankingSubSkillCombinations(
 					lv10: combination[0],
 					lv25: combination[1],
 					lv50: combination[2],
-					lv75: combination[3],
-					lv100: combination[4],
+					lv70: combination[3],
+					lv80: combination[4],
 				}),
 				skills: combination,
 				order,

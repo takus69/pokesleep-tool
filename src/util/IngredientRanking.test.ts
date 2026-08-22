@@ -843,8 +843,10 @@ describe("calculateIngredientRanking", () => {
 		{ level: 10, slotCount: 1, combinations: 13 },
 		{ level: 25, slotCount: 2, combinations: 79 },
 		{ level: 50, slotCount: 3, combinations: 299 },
-		{ level: 75, slotCount: 4, combinations: 794 },
-		{ level: 100, slotCount: 5, combinations: 1586 },
+		{ level: 69, slotCount: 3, combinations: 299 },
+		{ level: 70, slotCount: 4, combinations: 794 },
+		{ level: 79, slotCount: 4, combinations: 794 },
+		{ level: 80, slotCount: 5, combinations: 1586 },
 	])("generates canonical sub-skill combinations at level $level", ({
 		level,
 		slotCount,
@@ -860,8 +862,8 @@ describe("calculateIngredientRanking", () => {
 		expect(generated[0].neutralSubSkillCount).toBe(slotCount);
 		expect(generated.at(-1)?.skills).toHaveLength(slotCount);
 		expect(generated.at(-1)?.neutralSubSkillCount).toBe(0);
-		expect(generated.at(-1)?.subSkills.lv75 === null).toBe(slotCount < 4);
-		expect(generated.at(-1)?.subSkills.lv100 === null).toBe(slotCount < 5);
+		expect(generated.at(-1)?.subSkills.lv70 === null).toBe(slotCount < 4);
+		expect(generated.at(-1)?.subSkills.lv80 === null).toBe(slotCount < 5);
 	});
 
 	test("does not inherit nature or sub-skills from the current IV", () => {

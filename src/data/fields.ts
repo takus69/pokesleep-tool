@@ -1,6 +1,9 @@
 import fields_ from "./field.json";
 import type { PokemonType } from "./pokemons";
 
+/** Area index for Cyan Beach (Expert) */
+export const cbexFieldIndex = 8;
+
 export interface FieldData {
 	/** field index */
 	index: number;
@@ -88,6 +91,9 @@ export function getFavoriteBerries(index: number): PokemonType[] {
 		// Greengrass Isle (Expert)
 		case 7:
 			return [];
+		// Cyan Beach (Expert)
+		case 8:
+			return ["water", "fairy", "flying"];
 	}
 	return [];
 }
