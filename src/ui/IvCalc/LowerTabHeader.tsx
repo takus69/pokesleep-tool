@@ -38,7 +38,6 @@ const LowerTabHeader = React.memo(
 		isBoxEmpty: boolean;
 		dispatch: (action: IvAction) => void;
 	}) => {
-		const upperTabIndex = state.tabIndex;
 		const tabIndex = state.lowerTabIndex;
 
 		const [moreMenuAnchor, setMoreMenuAnchor] =
@@ -116,9 +115,7 @@ const LowerTabHeader = React.memo(
 				<StyledTabs value={tabIndex} onChange={onTabChange}>
 					<StyledTab label={t("pokemon")} />
 					<StyledTab label={t("box")} ref={boxTabRef} />
-					{(upperTabIndex === 1 || upperTabIndex === 3) && (
-						<StyledTab label={t("parameter")} />
-					)}
+					<StyledTab label={t("parameter")} />
 				</StyledTabs>
 
 				<Menu

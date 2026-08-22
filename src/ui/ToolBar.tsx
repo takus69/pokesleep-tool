@@ -1,17 +1,9 @@
-import CheckIcon from "@mui/icons-material/Check";
 import HelpOutlineIcon from "@mui/icons-material/HelpOutline";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import MailOutlineIcon from "@mui/icons-material/MailOutline";
 import MoreIcon from "@mui/icons-material/MoreVert";
 import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
-import {
-	Divider,
-	Icon,
-	IconButton,
-	ListItemIcon,
-	Menu,
-	MenuItem,
-} from "@mui/material";
+import { IconButton, ListItemIcon, Menu, MenuItem } from "@mui/material";
 import { styled } from "@mui/system";
 import type React from "react";
 import { useState } from "react";
@@ -25,29 +17,16 @@ import SettingsDialog from "./Dialog/SettingsDialog";
 
 interface ToolBarProps {
 	app: AppType;
-	onAppChange: (value: AppType) => void;
 	onAppConfigChange: (value: AppConfig) => void;
 }
 
-export default function ToolBar({
-	app,
-	onAppChange,
-	onAppConfigChange,
-}: ToolBarProps) {
+export default function ToolBar({ app, onAppConfigChange }: ToolBarProps) {
 	const { t } = useTranslation();
 
 	const [moreMenuAnchor, setMoreMenuAnchor] = useState<HTMLElement | null>(
 		null,
 	);
 	const isMoreMenuOpen = Boolean(moreMenuAnchor);
-	const researchCalcClick = () => {
-		onAppChange("ResearchCalc");
-		setMoreMenuAnchor(null);
-	};
-	const rpCalcClick = () => {
-		onAppChange("IvCalc");
-		setMoreMenuAnchor(null);
-	};
 	const moreButtonClick = (event: React.MouseEvent<HTMLElement>) => {
 		setMoreMenuAnchor(event.currentTarget);
 	};
@@ -103,19 +82,6 @@ export default function ToolBar({
 				onClose={onMoreMenuClose}
 				anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
 			>
-				<MenuItem onClick={researchCalcClick}>
-					<ListItemIcon>
-						{app === "ResearchCalc" ? <CheckIcon /> : <Icon />}
-					</ListItemIcon>
-					{t("ResearchCalc.short title")}
-				</MenuItem>
-				<MenuItem onClick={rpCalcClick}>
-					<ListItemIcon>
-						{app === "IvCalc" ? <CheckIcon /> : <Icon />}
-					</ListItemIcon>
-					{t("IvCalc.short title")}
-				</MenuItem>
-				<Divider />
 				{app === "IvCalc" && (
 					<MenuItem onClick={newsMenuClick}>
 						<ListItemIcon>

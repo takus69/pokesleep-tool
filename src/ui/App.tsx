@@ -3,12 +3,13 @@ import { createTheme, ThemeProvider } from "@mui/material";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type AppConfig from "./AppConfig";
-import { AppConfigContext, type AppType, saveConfig } from "./AppConfig";
+import { AppConfigContext, saveConfig } from "./AppConfig";
 import IvCalcApp from "./IvCalc/IvCalcApp";
 import NewsInfo from "./NewsInfo";
 import PwaNotify from "./PwaBanner";
-import ResearchCalcApp from "./ResearchCalc/ResearchCalcApp";
 import ToolBar from "./ToolBar";
+
+const app = "IvCalc" as const;
 
 const defaultTheme = createTheme({
 	typography: {
@@ -36,15 +37,8 @@ const scTheme = createTheme({
 
 export default function App({ config }: { config: AppConfig }) {
 	const language = useMultilingual(config);
-	const [curApp, setCurApp] = useRouter(language);
+	useAppMetadata(language);
 	const [appConfig, setAppConfig] = useState(config);
-
-	const onAppChange = useCallback(
-		(value: AppType) => {
-			setCurApp(value);
-		},
-		[setCurApp],
-	);
 	const onAppConfigChange = useCallback((value: AppConfig) => {
 		saveConfig(value);
 		setAppConfig(value);
@@ -67,16 +61,11 @@ export default function App({ config }: { config: AppConfig }) {
 	return (
 		<ThemeProvider theme={theme}>
 			<AppConfigContext.Provider value={appConfig}>
-				<ToolBar
-					app={curApp}
-					onAppChange={onAppChange}
-					onAppConfigChange={onAppConfigChange}
-				/>
-				<NewsInfo appType={curApp} onAppConfigChange={onAppConfigChange} />
-				{curApp === "ResearchCalc" && <ResearchCalcApp />}
-				{curApp === "IvCalc" && <IvCalcApp />}
+				<ToolBar app={app} onAppConfigChange={onAppConfigChange} />
+				<NewsInfo appType={app} onAppConfigChange={onAppConfigChange} />
+				<IvCalcApp />
 				<PwaNotify
-					app={curApp}
+					app={app}
 					pwaCount={config.pwacnt}
 					onClose={onPwaBannerClose}
 				/>
@@ -114,22 +103,15 @@ function useMultilingual(config: AppConfig) {
 }
 
 /**
- * A custom react hook for managing URL.
+ * A custom react hook for updating localized metadata and preserving the
+ * current public route.
  * @param language Current language.
- * @return Current app type and setter for it.
  */
-function useRouter(language: string): [AppType, (v: AppType) => void] {
-	const initialApp: AppType = window.location.pathname.startsWith(
-		"/pokesleep-tool/iv/",
-	)
-		? "IvCalc"
-		: "ResearchCalc";
-
+function useAppMetadata(language: string) {
 	const { t } = useTranslation();
-	const [currentApp, setCurrentApp] = useState<AppType>(initialApp);
 	useEffect(() => {
 		// Replace on memory HTML
-		document.title = t(`${currentApp}.title`);
+		document.title = t(`${app}.title`);
 		const manifest = document.querySelector<HTMLLinkElement>(
 			"link[rel='manifest']",
 		);
@@ -144,7 +126,7 @@ function useRouter(language: string): [AppType, (v: AppType) => void] {
 			"meta[name='description']",
 		);
 		if (description !== null) {
-			description.content = t(`${currentApp}.description`);
+			description.content = t(`${app}.description`);
 		}
 		const html = document.querySelector<HTMLHtmlElement>("html");
 		if (html !== null) {
@@ -167,15 +149,14 @@ function useRouter(language: string): [AppType, (v: AppType) => void] {
 		}
 
 		// update URL
-		let url = `${document.location.origin}/pokesleep-tool/`;
-		if (currentApp === "IvCalc") {
-			url += "iv/";
-		}
+		const isIvRoute = window.location.pathname.startsWith(
+			"/pokesleep-tool/iv/",
+		);
+		let url = `${document.location.origin}/pokesleep-tool/${isIvRoute ? "iv/" : ""}`;
 		if (language !== "en") {
 			url += `index.${language.toLowerCase()}.html`;
 		}
 		const query = document.location.search + document.location.hash;
 		window.history.replaceState(null, "", url + query);
-	}, [language, t, currentApp]);
-	return [currentApp, setCurrentApp];
+	}, [language, t]);
 }

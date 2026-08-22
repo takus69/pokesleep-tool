@@ -1,5 +1,4 @@
-import { Button, Snackbar, Tab, Tabs } from "@mui/material";
-import { styled } from "@mui/system";
+import { Button, Snackbar } from "@mui/material";
 import React from "react";
 import { useTranslation } from "react-i18next";
 import type { PokemonBoxItem } from "../../util/PokemonBox";
@@ -14,39 +13,19 @@ import IvForm from "./IvForm/IvForm";
 import { getInitialIvState, ivStateReducer } from "./IvState";
 import LowerTabHeader from "./LowerTabHeader";
 import RateNotFixedPanel from "./RateNotFixedPanel";
-import RatingView from "./RatingView";
-import RpView from "./Rp/RpView";
 import StrengthSettingForm from "./Strength/StrengthParameterForm";
-import StrengthView from "./Strength/StrengthView";
-
-const StyledTabs = styled(Tabs)({
-	minHeight: "36px",
-	marginBottom: "clamp(.3rem, 0.6vh, .7rem)",
-});
-const StyledTab = styled(Tab)({
-	minHeight: "36px",
-	padding: "6px 16px",
-});
 
 const initialIvState = getInitialIvState();
 
-const ResearchCalcApp = React.memo(() => {
+const IvCalcApp = React.memo(() => {
 	const [state, dispatch] = React.useReducer(ivStateReducer, initialIvState);
 	const { t } = useTranslation();
-	const width = useDomWidth();
 
 	const selectedItem = state.box.getById(state.selectedItemId);
 
 	const onPokemonIvChange = React.useCallback((value: PokemonIv) => {
 		dispatch({ type: "updateIv", payload: { iv: value } });
 	}, []);
-
-	const onTabChange = React.useCallback(
-		(_event: React.SyntheticEvent, newValue: number) => {
-			dispatch({ type: "changeUpperTab", payload: { index: newValue } });
-		},
-		[],
-	);
 
 	const onRestoreClick = React.useCallback(() => {
 		dispatch({ type: "restoreItem" });
@@ -91,27 +70,7 @@ const ResearchCalcApp = React.memo(() => {
 					background: "#f9f9f9",
 				}}
 			>
-				<StyledTabs
-					value={state.tabIndex}
-					onChange={onTabChange}
-					variant="scrollable"
-					scrollButtons={false}
-				>
-					<StyledTab label={t("rp")} />
-					<StyledTab label={t("strength2")} />
-					<StyledTab label={t("rating")} />
-					<StyledTab label={t("ranking")} />
-				</StyledTabs>
-				{state.tabIndex === 0 && <RpView state={state} width={width} />}
-				{state.tabIndex === 1 && (
-					<StrengthView state={state} dispatch={dispatch} />
-				)}
-				{state.tabIndex === 2 && (
-					<RatingView pokemonIv={state.pokemonIv} width={width} />
-				)}
-				{state.tabIndex === 3 && (
-					<IngredientRankingView state={state} dispatch={dispatch} />
-				)}
+				<IngredientRankingView state={state} dispatch={dispatch} />
 				<RateNotFixedPanel state={state} dispatch={dispatch} />
 
 				<LowerTabHeader
@@ -192,19 +151,4 @@ const ResearchCalcApp = React.memo(() => {
 	);
 });
 
-function useDomWidth() {
-	const [width, setWidth] = React.useState(0);
-	React.useEffect(() => {
-		const handler = () => {
-			setWidth(document.documentElement.clientWidth);
-		};
-		handler();
-		window.addEventListener("resize", handler);
-		return () => {
-			window.removeEventListener("resize", handler);
-		};
-	}, []);
-	return width;
-}
-
-export default ResearchCalcApp;
+export default IvCalcApp;
