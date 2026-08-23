@@ -1,7 +1,9 @@
-# Calc Tools for Pokémon Sleep
+# Pokémon Sleep Ranking Tool
 
-- [IV Calc](https://nitoyon.github.io/pokesleep-tool/iv/)
-- [Research Calc](https://nitoyon.github.io/pokesleep-tool/)
+Personal ranking-focused fork of [nitoyon/pokesleep-tool](https://github.com/nitoyon/pokesleep-tool).
+
+- [Published application](https://takus69.github.io/pokesleep-tool/)
+- [Upstream project](https://github.com/nitoyon/pokesleep-tool)
 
 Feel free to [contribute](CONTRIBUTING.md)!
 
@@ -36,4 +38,10 @@ Runs unit tests.
 
 ## License
 
-MIT
+The upstream project identifies its license as MIT in its README. At the time this fork's license documentation was prepared, upstream did not include a standalone license file. This fork preserves the upstream declaration and includes the standard MIT text in [LICENSE](LICENSE).
+
+The original project remains copyright of nitoyon and its respective contributors. Fork-specific changes remain copyright of their respective contributors; no transfer or consolidation of ownership is intended.
+
+Third-party attributions, including the MIT-licensed icons created by ちゃんりわ, are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). The deployed application also publishes [LICENSE.txt](https://takus69.github.io/pokesleep-tool/LICENSE.txt), [THIRD_PARTY_NOTICES.txt](https://takus69.github.io/pokesleep-tool/THIRD_PARTY_NOTICES.txt), and a build-generated [OPEN_SOURCE_LICENSES.txt](https://takus69.github.io/pokesleep-tool/OPEN_SOURCE_LICENSES.txt) for bundled dependencies.
+
+Pokémon-related names, characters, and marks belong to their respective rights holders. This is an unofficial tool and is not affiliated with or endorsed by the relevant rights holders. The software's MIT License does not grant rights to third-party trademarks, game content, or other third-party materials.

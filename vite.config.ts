@@ -7,6 +7,9 @@ export default defineConfig({
 	base: "/pokesleep-tool/",
 	plugins: [react(), serviceWorkerPlugin()],
 	build: {
+		license: {
+			fileName: "OPEN_SOURCE_LICENSES.txt",
+		},
 		rollupOptions: {
 			input: {
 				reserchEn: path.resolve(__dirname, "index.html"),

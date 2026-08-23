@@ -53,10 +53,11 @@
 	"push share icon": "点击 Safari 下方的 <share/> 。(如果找不到，请尝试关闭此弹出窗口并向上滑动)",
 	"select add to home screen": "在菜单里选择 [添加到主屏幕 <add/>] 。",
 	"copied": "已复制到剪贴板。",
-	"about1": "本工具非官方工具，由 <profile>nitoyon</profile> 个人制作开发。",
-	"profile": "http://tech.nitoyon.com/ja/about/",
-	"x username": "nitoyon1",
-	"about2": "改善请求和错误报告请通过X (twitter) <x>@nitoyon1</x> 或者 <github>GitHub</github> 进行联系。",
+	"about1": "本应用是基于 nitoyon 开发的 <upstream>nitoyon/pokesleep-tool</upstream> 创建的分支版本。",
+	"about2": "本分支版本包含独立修改，由 <maintainer>takus69</maintainer> 维护。源代码发布于 <source>takus69/pokesleep-tool</source>。",
 	"about3": "使用的数据参照了「<wiki>ポケモンスリープ攻略・検証Wiki</wiki>」，「<rp>RP collection project</rp>」，以及「<raenonx>RaenonX</raenonx>」。食材图标由ちゃんりわさん制作。",
-	"about4": "本工具的数据、模拟结果、截图等欢迎自由使用。使用时，如能注明使用了本工具，将不胜感激。"
+	"about4": "本工具的数据、模拟结果、截图等欢迎自由使用。使用时，如能注明使用了本工具，将不胜感激。",
+	"about5": "本应用是非官方的爱好者作品，与 Nintendo、Creatures Inc.、GAME FREAK inc.、The Pokémon Company 及其关联公司不存在合作、赞助或认可关系。",
+	"about6": "有关许可和署名的详情，请参阅 <license>MIT License</license>、<notices>第三方许可及声明</notices>和<dependencies>开源依赖包许可清单</dependencies>。",
+	"about7": "如有改进建议或错误报告，请提交到本分支版本的 <issues>GitHub Issues</issues>。"
 }

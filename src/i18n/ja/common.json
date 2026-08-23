@@ -53,10 +53,11 @@
 	"push share icon": "Safari の下側にある <share/> を押す。 (見つけられないときは、このポップアップを閉じてから上にスクロールしてみてください)",
 	"select add to home screen": "[ホーム画面に追加 <add/>] をメニューから選ぶ。",
 	"copied": "クリップボードにコピーしました。",
-	"about1": "このツールは非公式のツールであり、<profile>nitoyon</profile> が個人で開発しています。",
-	"profile": "http://tech.nitoyon.com/ja/about/",
-	"x username": "nitoyon",
-	"about2": "改善要望・不具合報告は、X (twitter) の <x>@nitoyon</x> または <github>GitHub</github> までお願いします。",
+	"about1": "このアプリは、nitoyonさんが開発した <upstream>nitoyon/pokesleep-tool</upstream> を元にしたフォークです。",
+	"about2": "このフォークには独自の改変が含まれており、<maintainer>takus69</maintainer> が運営しています。ソースコードは <source>takus69/pokesleep-tool</source> で公開しています。",
 	"about3": "利用しているデータは「<wiki>ポケモンスリープ攻略・検証Wiki</wiki>」「<rp>RP collection project</rp>」「<raenonx>RaenonX</raenonx>」を参照しています。食材のアイコンは、ちゃんりわさんが作成してくれました。",
-	"about4": "ツールのデータ・シミュレーション結果・スクリーンショットなどは自由にご利用いただけます。その際、当ツールを利用していることを記載していただけると嬉しいです。"
+	"about4": "ツールのデータ・シミュレーション結果・スクリーンショットなどは自由にご利用いただけます。その際、当ツールを利用していることを記載していただけると嬉しいです。",
+	"about5": "このアプリは非公式のファンメイドアプリです。任天堂、クリーチャーズ、ゲームフリーク、株式会社ポケモン、および各社の関係会社とは提携・協賛・承認関係にありません。",
+	"about6": "ライセンスと帰属表示の詳細は、<license>MIT License</license>、<notices>第三者ライセンス・通知</notices>、<dependencies>オープンソース依存パッケージのライセンス一覧</dependencies>をご覧ください。",
+	"about7": "改善要望・不具合報告は、このフォークの <issues>GitHub Issues</issues> までお願いします。"
 }

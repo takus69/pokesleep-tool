@@ -53,10 +53,11 @@
 	"push share icon": "Safari 하단에 있는 <share/>를 누르세요. (찾을 수 없을 때는, 이 팝업을 닫고 나서 위로 스크롤해 보세요)",
 	"select add to home screen": "[홈 화면에 추가 <add/>]를 메뉴에서 선택하세요.",
 	"copied": "클립보드에 복사되었습니다.",
-	"about1": "이 도구는 비공식 도구이며, <profile>nitoyon</profile>이 개인적으로 개발했습니다.",
-	"profile": "http://tech.nitoyon.com/ja/about/",
-	"x username": "nitoyon1",
-	"about2": "개선 요청 및 버그 신고는, X (트위터)의 <x>@nitoyon1</x> 또는 <github>GitHub</github>로 부탁드립니다.",
+	"about1": "이 앱은 nitoyon이 개발한 <upstream>nitoyon/pokesleep-tool</upstream>을 기반으로 한 포크입니다.",
+	"about2": "이 포크에는 독자적인 수정 사항이 포함되어 있으며 <maintainer>takus69</maintainer>이 운영합니다. 소스 코드는 <source>takus69/pokesleep-tool</source>에서 공개하고 있습니다.",
 	"about3": "사용하고 있는 데이터는 '<wiki>포켓몬 슬립 공략·검증 Wiki</wiki>', '<rp>SP 수집 프로젝트</rp>', 그리고 '<raenonx>RaenonX</raenonx>'를 참조하고 있습니다. 식재료의 아이콘은 ちゃんりわ 씨가 만들었습니다.",
-	"about4": "이 도구의 데이터·시뮬레이션 결과·스크린샷 등은 자유롭게 이용하실 수 있습니다. 그때 이 도구를 이용하고 있다는 점을 기재해 주시면 감사하겠습니다."
+	"about4": "이 도구의 데이터·시뮬레이션 결과·스크린샷 등은 자유롭게 이용하실 수 있습니다. 그때 이 도구를 이용하고 있다는 점을 기재해 주시면 감사하겠습니다.",
+	"about5": "이 앱은 비공식 팬 제작 앱입니다. Nintendo, Creatures Inc., GAME FREAK inc., The Pokémon Company 및 그 관계사와 제휴하거나 후원·승인받은 관계가 아닙니다.",
+	"about6": "라이선스 및 저작자 표시의 자세한 내용은 <license>MIT License</license>, <notices>제3자 라이선스 및 고지</notices>, <dependencies>오픈 소스 의존 패키지 라이선스 목록</dependencies>을 확인해 주세요.",
+	"about7": "개선 요청 및 버그 신고는 이 포크의 <issues>GitHub Issues</issues>에 남겨 주세요."
 }
