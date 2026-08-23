@@ -21,7 +21,18 @@ import { useTranslation } from "react-i18next";
 import pokemons, {
 	type IngredientName,
 	IngredientNames,
-} from "../../data/pokemons";
+} from "../data/pokemons";
+import IngredientCountIcon from "../ui/IvCalc/IngredientCountIcon";
+import IngredientIcon from "../ui/IvCalc/IngredientIcon";
+import IvForm from "../ui/IvCalc/IvForm/IvForm";
+import PokemonSelectDialog from "../ui/IvCalc/IvForm/PokemonSelectDialog";
+import type { PokemonOption } from "../ui/IvCalc/IvForm/PokemonTextField";
+import SleepingTimeControl from "../ui/IvCalc/IvForm/SleepingTimeControl";
+import type IvState from "../ui/IvCalc/IvState";
+import type { IvAction } from "../ui/IvCalc/IvState";
+import PokemonIcon from "../ui/IvCalc/PokemonIcon";
+import StrengthSettingForm from "../ui/IvCalc/Strength/StrengthParameterForm";
+import StrengthParameterSummary from "../ui/IvCalc/Strength/StrengthParameterSummary";
 import {
 	calculateIngredientRankingAsync,
 	createIngredientRankingBaselineIv,
@@ -30,21 +41,11 @@ import {
 	type IngredientRankingEntry,
 	type IngredientRankingTarget,
 	mergeIngredientRankingComparison,
-} from "../../util/IngredientRanking";
-import PokemonIv from "../../util/PokemonIv";
-import IngredientCountIcon from "./IngredientCountIcon";
-import IngredientIcon from "./IngredientIcon";
-import IvForm from "./IvForm/IvForm";
-import PokemonSelectDialog from "./IvForm/PokemonSelectDialog";
-import type { PokemonOption } from "./IvForm/PokemonTextField";
-import SleepingTimeControl from "./IvForm/SleepingTimeControl";
-import type IvState from "./IvState";
-import type { IvAction } from "./IvState";
-import PokemonIcon from "./PokemonIcon";
-import StrengthSettingForm from "./Strength/StrengthParameterForm";
-import StrengthParameterSummary from "./Strength/StrengthParameterSummary";
+} from "../util/IngredientRanking";
+import PokemonIv from "../util/PokemonIv";
 
 const pageSize = 100;
+const rankingI18nKey = (key: string) => `fork.ingredientRanking.${key}`;
 
 type ComparisonMode = "baseline" | "manual" | "registered";
 const rankingTargets: IngredientRankingTarget[] = [
@@ -245,7 +246,7 @@ const IngredientRankingView = React.memo(
 			(name: IngredientName) => (
 				<StyledIngredientOption>
 					<IngredientIcon name={name} />
-					<span>{t(`ingredient names.${name}`)}</span>
+					<span>{t(rankingI18nKey(`ingredient names.${name}`))}</span>
 				</StyledIngredientOption>
 			),
 			[t],
@@ -314,7 +315,9 @@ const IngredientRankingView = React.memo(
 			comparison.evaluation.status === "uncalculable"
 				? null
 				: comparison.evaluation.count;
-		const rankingTargetLabel = t(rankingTargetLabelKeys[rankingTarget]);
+		const rankingTargetLabel = t(
+			rankingI18nKey(rankingTargetLabelKeys[rankingTarget]),
+		);
 		const comparisonRank = comparison.rank;
 		const theoreticalPageCount = Math.ceil(rankingGroups.length / pageSize);
 		const pageCount = Math.max(
@@ -350,9 +353,9 @@ const IngredientRankingView = React.memo(
 			<StyledRanking>
 				<StyledConditionSummary>
 					<StyledConditionHeader>
-						<strong>{t("ranking common settings")}</strong>
+						<strong>{t(rankingI18nKey("ranking common settings"))}</strong>
 						<Button size="small" onClick={onDetailedSettingsClick}>
-							{t("detailed settings")}
+							{t(rankingI18nKey("detailed settings"))}
 						</Button>
 					</StyledConditionHeader>
 					<StrengthParameterSummary state={state} dispatch={dispatch} />
@@ -360,7 +363,7 @@ const IngredientRankingView = React.memo(
 						{t("sleep score")}: {parameter.sleepScore}
 					</StyledSleepScore>
 					<StyledRankingLevelNote>
-						{t("ranking uses selected levels")}
+						{t(rankingI18nKey("ranking uses selected levels"))}
 					</StyledRankingLevelNote>
 				</StyledConditionSummary>
 				<StyledControls>
@@ -381,7 +384,7 @@ const IngredientRankingView = React.memo(
 					</FormControl>
 					<FormControl variant="standard" size="small" required>
 						<InputLabel id="ingredient-ranking-target-kind-label">
-							{t("ranking target")}
+							{t(rankingI18nKey("ranking target"))}
 						</InputLabel>
 						<Select
 							labelId="ingredient-ranking-target-kind-label"
@@ -390,7 +393,7 @@ const IngredientRankingView = React.memo(
 						>
 							{rankingTargets.map((target) => (
 								<MenuItem key={target} value={target}>
-									{t(rankingTargetLabelKeys[target])}
+									{t(rankingI18nKey(rankingTargetLabelKeys[target]))}
 								</MenuItem>
 							))}
 						</Select>
@@ -398,7 +401,7 @@ const IngredientRankingView = React.memo(
 					{rankingTarget === "ingredientCount" && (
 						<FormControl variant="standard" size="small" required>
 							<InputLabel id="ingredient-ranking-target-label">
-								{t("target ingredient")}
+								{t(rankingI18nKey("target ingredient"))}
 							</InputLabel>
 							<Select
 								labelId="ingredient-ranking-target-label"
@@ -435,16 +438,15 @@ const IngredientRankingView = React.memo(
 					open={detailedSettingsOpen}
 					onClose={onDetailedSettingsClose}
 				>
-					<DialogTitle>{t("detailed settings")}</DialogTitle>
-					<DialogContent>
+					<DialogTitle>{t(rankingI18nKey("detailed settings"))}</DialogTitle>
+					<StyledDetailedSettingsContent>
 						<StrengthSettingForm
 							value={parameter}
 							items={state.box.items}
 							hasHelpingBonus={state.pokemonIv.hasHelpingBonusInActiveSubSkills}
 							dispatch={dispatch}
-							compact
 						/>
-					</DialogContent>
+					</StyledDetailedSettingsContent>
 					<DialogActions>
 						<Button onClick={onDetailedSettingsClose}>{t("close")}</Button>
 					</DialogActions>
@@ -460,7 +462,7 @@ const IngredientRankingView = React.memo(
 
 				<StyledComparisonCard>
 					<StyledComparisonHeader>
-						<strong>{t("comparison target")}</strong>
+						<strong>{t(rankingI18nKey("comparison target"))}</strong>
 						<ToggleButtonGroup
 							exclusive
 							size="small"
@@ -468,23 +470,23 @@ const IngredientRankingView = React.memo(
 							onChange={onComparisonModeChange}
 						>
 							<ToggleButton value="baseline">
-								{t("comparison baseline")}
+								{t(rankingI18nKey("comparison baseline"))}
 							</ToggleButton>
 							<ToggleButton value="manual">
-								{t("comparison manual")}
+								{t(rankingI18nKey("comparison manual"))}
 							</ToggleButton>
 							<ToggleButton value="registered">
-								{t("comparison registered")}
+								{t(rankingI18nKey("comparison registered"))}
 							</ToggleButton>
 						</ToggleButtonGroup>
 					</StyledComparisonHeader>
 					{comparisonMode === "registered" && (
 						<FormControl variant="standard" size="small">
-							<InputLabel>{t("registered pokemon")}</InputLabel>
+							<InputLabel>{t(rankingI18nKey("registered pokemon"))}</InputLabel>
 							<Select
 								value={registeredId}
 								onChange={onRegisteredChange}
-								label={t("registered pokemon")}
+								label={t(rankingI18nKey("registered pokemon"))}
 							>
 								{state.box.items.map((item) => (
 									<MenuItem key={item.id} value={item.id}>
@@ -501,7 +503,7 @@ const IngredientRankingView = React.memo(
 					)}
 					{comparisonMode === "manual" && (
 						<Button size="small" onClick={onManualEditClick}>
-							{t("edit comparison target")}
+							{t(rankingI18nKey("edit comparison target"))}
 						</Button>
 					)}
 					{comparisonIv !== null ? (
@@ -515,7 +517,9 @@ const IngredientRankingView = React.memo(
 							onGoToRankClick={onGoToRankClick}
 						/>
 					) : (
-						<StyledUnavailable>{t("comparison unavailable")}</StyledUnavailable>
+						<StyledUnavailable>
+							{t(rankingI18nKey("comparison unavailable"))}
+						</StyledUnavailable>
 					)}
 				</StyledComparisonCard>
 				<Dialog
@@ -524,7 +528,9 @@ const IngredientRankingView = React.memo(
 					open={manualDialogOpen}
 					onClose={onManualDialogClose}
 				>
-					<DialogTitle>{t("edit comparison target")}</DialogTitle>
+					<DialogTitle>
+						{t(rankingI18nKey("edit comparison target"))}
+					</DialogTitle>
 					<DialogContent>
 						<IvForm
 							parameter={parameter}
@@ -540,7 +546,7 @@ const IngredientRankingView = React.memo(
 
 				<StyledPaginationSummary>
 					<span>
-						{t("ranking result range", {
+						{t(rankingI18nKey("ranking result range"), {
 							start: pageGroups.length === 0 ? 0 : pageStart + 1,
 							end: pageGroups.length === 0 ? 0 : pageEnd,
 							total: ranking.length,
@@ -556,9 +562,9 @@ const IngredientRankingView = React.memo(
 				</StyledPaginationSummary>
 				<StyledResults>
 					<StyledHeader>
-						<span>{t("rank")}</span>
+						<span>{t(rankingI18nKey("rank"))}</span>
 						<span>{t("pokemon")}</span>
-						<span>{t("ingredient configuration")}</span>
+						<span>{t(rankingI18nKey("ingredient configuration"))}</span>
 						<span>{rankingTargetLabel}</span>
 					</StyledHeader>
 					{calculating && (
@@ -567,7 +573,7 @@ const IngredientRankingView = React.memo(
 						</StyledLoading>
 					)}
 					{!calculating && ranking.length === 0 && (
-						<StyledEmpty>{t("no ranking results")}</StyledEmpty>
+						<StyledEmpty>{t(rankingI18nKey("no ranking results"))}</StyledEmpty>
 					)}
 					{!calculating &&
 						pageGroups.flatMap((group, index) => {
@@ -663,9 +669,9 @@ const RankingRow = React.memo(
 								onChange={(event) => {
 									setSelectedVariantIndex(Number(event.target.value));
 								}}
-								aria-label={t("ranking equivalent variants")}
+								aria-label={t(rankingI18nKey("ranking equivalent variants"))}
 								renderValue={(value) =>
-									t("ranking variant label", {
+									t(rankingI18nKey("ranking variant label"), {
 										current: Number(value) + 1,
 										count: result.variants.length,
 									})
@@ -698,7 +704,7 @@ const RankingVariantOption = React.memo(
 		);
 		if (variant.neutralSubSkillCount > 0) {
 			subSkillNames.push(
-				`${t("neutral subskill")} ×${variant.neutralSubSkillCount}`,
+				`${t(rankingI18nKey("neutral subskill"))} ×${variant.neutralSubSkillCount}`,
 			);
 		}
 
@@ -733,7 +739,7 @@ const ComparisonRow = React.memo(
 				<IngredientConfiguration iv={iv} />
 				<StyledCount>
 					{count === null
-						? t("comparison unavailable")
+						? t(rankingI18nKey("comparison unavailable"))
 						: countFormatter.format(count)}
 				</StyledCount>
 			</StyledRow>
@@ -784,7 +790,9 @@ const AppliedTraits = React.memo(
 			t(`subskill.${subSkill.name}`),
 		);
 		if (neutralSubSkillCount > 0) {
-			subSkillNames.push(`${t("neutral subskill")} ×${neutralSubSkillCount}`);
+			subSkillNames.push(
+				`${t(rankingI18nKey("neutral subskill"))} ×${neutralSubSkillCount}`,
+			);
 		}
 		return (
 			<StyledAppliedTraits>
@@ -851,15 +859,15 @@ const ComparisonSummary = React.memo(
 				<div>
 					<strong>{valueLabel}:</strong>{" "}
 					{count === null
-						? t("comparison unavailable")
+						? t(rankingI18nKey("comparison unavailable"))
 						: countFormatter.format(count)}
 				</div>
 				<div>
-					<strong>{t("equivalent rank")}:</strong>{" "}
-					{rank === null ? t("comparison unavailable") : rank}
+					<strong>{t(rankingI18nKey("equivalent rank"))}:</strong>{" "}
+					{rank === null ? t(rankingI18nKey("comparison unavailable")) : rank}
 				</div>
 				<Button size="small" disabled={rank === null} onClick={onGoToRankClick}>
-					{t("go to comparison rank")}
+					{t(rankingI18nKey("go to comparison rank"))}
 				</Button>
 			</StyledComparisonSummary>
 		);
@@ -876,6 +884,13 @@ function getIngredientSlots(iv: PokemonIv) {
 
 const StyledRanking = styled("section")({
 	paddingBottom: ".4rem",
+});
+
+const StyledDetailedSettingsContent = styled(DialogContent)({
+	"& > div": {
+		padding: 0,
+		marginBottom: 0,
+	},
 });
 
 const StyledConditionSummary = styled("section")({

@@ -1,7 +1,8 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
+import { registerForkTranslations } from "./fork/i18n";
+import App from "./fork/RankingApp";
 import i18n, { loadLanguage } from "./i18n";
-import App from "./ui/App";
 import { loadConfig, saveConfig } from "./ui/AppConfig";
 
 (async () => {
@@ -28,6 +29,7 @@ import { loadConfig, saveConfig } from "./ui/AppConfig";
 	config.pwacnt++;
 	saveConfig(config);
 	await loadLanguage(config.language);
+	registerForkTranslations(config.language);
 	i18n.changeLanguage(config.language);
 
 	const elm = document.getElementById("root");

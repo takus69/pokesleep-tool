@@ -1,50 +1,31 @@
-import "./App.css";
+import "../ui/App.css";
 import { createTheme, ThemeProvider } from "@mui/material";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type AppConfig from "./AppConfig";
-import { AppConfigContext, type AppType, saveConfig } from "./AppConfig";
-import IvCalcApp from "./IvCalc/IvCalcApp";
-import NewsInfo from "./NewsInfo";
-import PwaNotify from "./PwaBanner";
-import ResearchCalcApp from "./ResearchCalc/ResearchCalcApp";
-import ToolBar from "./ToolBar";
+import type AppConfig from "../ui/AppConfig";
+import { AppConfigContext, saveConfig } from "../ui/AppConfig";
+import NewsInfo from "../ui/NewsInfo";
+import PwaNotify from "../ui/PwaBanner";
+import { registerForkTranslations } from "./i18n";
+import RankingToolBar from "./RankingToolBar";
+import RankingWorkspace from "./RankingWorkspace";
+
+const app = "IvCalc" as const;
 
 const defaultTheme = createTheme({
-	typography: {
-		allVariants: {
-			fontFamily: `"M PLUS 1p"`,
-		},
-	},
+	typography: { allVariants: { fontFamily: `"M PLUS 1p"` } },
 });
-
 const tcTheme = createTheme({
-	typography: {
-		allVariants: {
-			fontFamily: `"Noto Sans TC"`,
-		},
-	},
+	typography: { allVariants: { fontFamily: `"Noto Sans TC"` } },
 });
-
 const scTheme = createTheme({
-	typography: {
-		allVariants: {
-			fontFamily: `"Noto Sans SC"`,
-		},
-	},
+	typography: { allVariants: { fontFamily: `"Noto Sans SC"` } },
 });
 
-export default function App({ config }: { config: AppConfig }) {
+export default function RankingApp({ config }: { config: AppConfig }) {
 	const language = useMultilingual(config);
-	const [curApp, setCurApp] = useRouter(language);
+	useAppMetadata(language);
 	const [appConfig, setAppConfig] = useState(config);
-
-	const onAppChange = useCallback(
-		(value: AppType) => {
-			setCurApp(value);
-		},
-		[setCurApp],
-	);
 	const onAppConfigChange = useCallback((value: AppConfig) => {
 		saveConfig(value);
 		setAppConfig(value);
@@ -56,7 +37,6 @@ export default function App({ config }: { config: AppConfig }) {
 		setAppConfig(appConfig);
 	}, [appConfig]);
 
-	// Set theme based on language
 	let theme = defaultTheme;
 	if (language === "zh-TW") {
 		theme = tcTheme;
@@ -67,16 +47,11 @@ export default function App({ config }: { config: AppConfig }) {
 	return (
 		<ThemeProvider theme={theme}>
 			<AppConfigContext.Provider value={appConfig}>
-				<ToolBar
-					app={curApp}
-					onAppChange={onAppChange}
-					onAppConfigChange={onAppConfigChange}
-				/>
-				<NewsInfo appType={curApp} onAppConfigChange={onAppConfigChange} />
-				{curApp === "ResearchCalc" && <ResearchCalcApp />}
-				{curApp === "IvCalc" && <IvCalcApp />}
+				<RankingToolBar app={app} onAppConfigChange={onAppConfigChange} />
+				<NewsInfo appType={app} onAppConfigChange={onAppConfigChange} />
+				<RankingWorkspace />
 				<PwaNotify
-					app={curApp}
+					app={app}
 					pwaCount={config.pwacnt}
 					onClose={onPwaBannerClose}
 				/>
@@ -85,18 +60,13 @@ export default function App({ config }: { config: AppConfig }) {
 	);
 }
 
-/**
- * A custom react hook for managing multilingual support.
- * @param config The global configuration object.
- * @return Current language.
- */
 function useMultilingual(config: AppConfig) {
 	const { i18n } = useTranslation();
 	const [language, setLanguage] = useState(config.language);
 
-	// Called when the language has been changed
 	const onLanguageChanged = useCallback(
 		(value: string) => {
+			registerForkTranslations(value);
 			setLanguage(value);
 			saveConfig({ ...config, language: value });
 		},
@@ -105,37 +75,21 @@ function useMultilingual(config: AppConfig) {
 
 	useEffect(() => {
 		i18n.on("languageChanged", onLanguageChanged);
-		return () => {
-			i18n.off("languageChanged", onLanguageChanged);
-		};
+		return () => i18n.off("languageChanged", onLanguageChanged);
 	}, [i18n, onLanguageChanged]);
 
 	return language;
 }
 
-/**
- * A custom react hook for managing URL.
- * @param language Current language.
- * @return Current app type and setter for it.
- */
-function useRouter(language: string): [AppType, (v: AppType) => void] {
-	const initialApp: AppType = window.location.pathname.startsWith(
-		"/pokesleep-tool/iv/",
-	)
-		? "IvCalc"
-		: "ResearchCalc";
-
+function useAppMetadata(language: string) {
 	const { t } = useTranslation();
-	const [currentApp, setCurrentApp] = useState<AppType>(initialApp);
 	useEffect(() => {
-		// Replace on memory HTML
-		document.title = t(`${currentApp}.title`);
+		document.title = t(`${app}.title`);
 		const manifest = document.querySelector<HTMLLinkElement>(
 			"link[rel='manifest']",
 		);
 		if (manifest !== null) {
-			const current = manifest.href;
-			manifest.href = current.replace(
+			manifest.href = manifest.href.replace(
 				/manifest.*/,
 				`manifest.${language}.json`,
 			);
@@ -144,7 +98,7 @@ function useRouter(language: string): [AppType, (v: AppType) => void] {
 			"meta[name='description']",
 		);
 		if (description !== null) {
-			description.content = t(`${currentApp}.description`);
+			description.content = t(`${app}.description`);
 		}
 		const html = document.querySelector<HTMLHtmlElement>("html");
 		if (html !== null) {
@@ -166,16 +120,17 @@ function useRouter(language: string): [AppType, (v: AppType) => void] {
 			}
 		}
 
-		// update URL
-		let url = `${document.location.origin}/pokesleep-tool/`;
-		if (currentApp === "IvCalc") {
-			url += "iv/";
-		}
+		const isIvRoute = window.location.pathname.startsWith(
+			"/pokesleep-tool/iv/",
+		);
+		let url = `${document.location.origin}/pokesleep-tool/${isIvRoute ? "iv/" : ""}`;
 		if (language !== "en") {
 			url += `index.${language.toLowerCase()}.html`;
 		}
-		const query = document.location.search + document.location.hash;
-		window.history.replaceState(null, "", url + query);
-	}, [language, t, currentApp]);
-	return [currentApp, setCurrentApp];
+		window.history.replaceState(
+			null,
+			"",
+			url + document.location.search + document.location.hash,
+		);
+	}, [language, t]);
 }

@@ -29,11 +29,7 @@ export default function AboutDialog({ open, onClose }: AboutDialogProps) {
 					<Trans
 						i18nKey="about1"
 						components={{
-							upstream: (
-								<a href="https://github.com/nitoyon/pokesleep-tool">
-									nitoyon/pokesleep-tool
-								</a>
-							),
+							profile: <a href={t("profile")}>profile</a>,
 						}}
 					/>
 				</Typography>
@@ -45,10 +41,14 @@ export default function AboutDialog({ open, onClose }: AboutDialogProps) {
 					<Trans
 						i18nKey="about2"
 						components={{
-							maintainer: <a href="https://github.com/takus69">takus69</a>,
-							source: (
-								<a href="https://github.com/takus69/pokesleep-tool">
-									takus69/pokesleep-tool
+							x: (
+								<a href={`https://twitter.com/${t("x username")}`}>
+									@{t("x username")}
+								</a>
+							),
+							github: (
+								<a href="https://github.com/nitoyon/pokesleep-tool/discussions">
+									GitHub
 								</a>
 							),
 						}}
@@ -72,53 +72,8 @@ export default function AboutDialog({ open, onClose }: AboutDialogProps) {
 						}}
 					/>
 				</Typography>
-				<Typography
-					sx={{
-						marginBottom: "16px",
-					}}
-				>
-					<Trans i18nKey="about4" />
-				</Typography>
-				<Typography
-					sx={{
-						marginBottom: "16px",
-					}}
-				>
-					<Trans i18nKey="about5" />
-				</Typography>
-				<Typography
-					sx={{
-						marginBottom: "16px",
-					}}
-				>
-					<Trans
-						i18nKey="about6"
-						components={{
-							license: <a href="/pokesleep-tool/LICENSE.txt">MIT License</a>,
-							notices: (
-								<a href="/pokesleep-tool/THIRD_PARTY_NOTICES.txt">
-									Third-party notices
-								</a>
-							),
-							dependencies: (
-								<a href="/pokesleep-tool/OPEN_SOURCE_LICENSES.txt">
-									Open-source dependency licenses
-								</a>
-							),
-						}}
-					/>
-				</Typography>
 				<Typography>
-					<Trans
-						i18nKey="about7"
-						components={{
-							issues: (
-								<a href="https://github.com/takus69/pokesleep-tool/issues">
-									GitHub Issues
-								</a>
-							),
-						}}
-					/>
+					<Trans i18nKey="about4" />
 				</Typography>
 			</DialogContent>
 			<DialogActions>

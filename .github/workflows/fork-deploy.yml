@@ -1,21 +1,15 @@
-name: Deploy
+name: Fork Deploy
 
 on:
-  # pushed to master
+  workflow_dispatch:
+
   push:
     branches:
       - main
 
-  # pull request to master is closed
-  pull_request:
-    branches:
-      - master
-    types:
-      - closed
-
 jobs:
   build:
-    if: github.repository_owner == 'nitoyon'
+    if: github.repository == 'takus69/pokesleep-tool'
     runs-on: ubuntu-latest
     permissions:
       contents: write

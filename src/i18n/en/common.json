@@ -54,11 +54,10 @@
 	"push share icon": "Press <share/> located at the bottom of the Safari. (If you cannot find the icon, close this popup and scroll upward)",
 	"select add to home screen": "Select [Add to Home Screen <add/>] from the menu.",
 	"copied": "Copied to the clipboard",
-	"about1": "This application is a fork based on <upstream>nitoyon/pokesleep-tool</upstream>, originally developed by nitoyon.",
-	"about2": "This fork contains independent modifications and is maintained by <maintainer>takus69</maintainer>. Its source code is available at <source>takus69/pokesleep-tool</source>.",
+	"about1": "This tool is an unofficial tool developed by <profile>nitoyon</profile>.",
+	"profile": "http://tech.nitoyon.com/en/about/",
+	"x username": "nitoyon1",
+	"about2": "If you have bug reports or improvement suggestions, please contact X (twitter) <x>@nitoyon1</x> or <github>GitHub repository</github>.",
 	"about3": "I am referring to the data from '<wiki>ポケモンスリープ攻略・検証Wiki</wiki>', '<rp>RP collection project</rp>' and '<raenonx>RaenonX</raenonx>'. The ingredient icon was created by ちゃんりわ.",
-	"about4": "Feel free to use this tool's data, simulation results, screenshots and so on. If you do, a credit mentioning this tool would be appreciated.",
-	"about5": "This is an unofficial fan-made application. It is not affiliated with, endorsed, sponsored, or approved by Nintendo, Creatures Inc., GAME FREAK inc., The Pokémon Company, or their affiliates.",
-	"about6": "For licensing and attribution details, see the <license>MIT License</license>, <notices>third-party notices</notices>, and <dependencies>open-source dependency licenses</dependencies>.",
-	"about7": "Please report bugs and improvement suggestions through the fork's <issues>GitHub Issues</issues>."
+	"about4": "Feel free to use this tool's data, simulation results, screenshots and so on. If you do, a credit mentioning this tool would be appreciated."
 }
