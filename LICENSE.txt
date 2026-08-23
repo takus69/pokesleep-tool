@@ -1,6 +1,7 @@
 MIT License
 
-Copyright (c) 2023-present nitoyon and other pokesleep-tool contributors
+Copyright (c) nitoyon and pokesleep-tool contributors
+Modifications Copyright (c) 2026 takus69
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
