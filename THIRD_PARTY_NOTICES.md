@@ -1,6 +1,6 @@
 # Third-Party Notices
 
-This project is a fork of [nitoyon/pokesleep-tool](https://github.com/nitoyon/pokesleep-tool). The upstream project's README identifies the project license as MIT. At the time this fork's license documentation was prepared, upstream did not include a standalone license file. This fork reproduces the standard MIT terms in [LICENSE](LICENSE) to preserve and clarify the upstream declaration. Copyright in the upstream work remains with nitoyon and its respective contributors. Copyright in later modifications remains with their respective contributors; this notice does not transfer or consolidate ownership.
+This project is a fork of [nitoyon/pokesleep-tool](https://github.com/nitoyon/pokesleep-tool). The upstream project's README identifies the project license as MIT. At the time this fork's license documentation was prepared, upstream did not include a standalone license file or a copyright year in that declaration. This fork reproduces the standard MIT terms in [LICENSE](LICENSE) to preserve and clarify the upstream declaration. Copyright in the upstream work remains with nitoyon and its respective contributors. The 2026 fork-specific modifications are copyright of takus69, while contributions remain copyright of their respective contributors; this notice does not transfer or consolidate ownership.
 
 ## Icons by ちゃんりわ
 
