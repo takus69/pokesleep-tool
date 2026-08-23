@@ -23,6 +23,8 @@
 		"fmt": "biome format --write",
 		"lint": "oxlint && biome check --error-on-warnings",
 		"lint:fix": "oxlint --fix && biome check --write --error-on-warnings",
+		"test:upstream-boundary": "node --test scripts/verify-upstream-boundary.node-test.mjs",
+		"verify:upstream-boundary": "node scripts/verify-upstream-boundary.mjs",
 		"verify": "npm run typecheck && npm run lint && npm run test -- run && npm run build",
 		"preview": "vite preview",
 		"rpfit": "npx ts-node --project scripts/tsconfig.json scripts/rpfit.ts",

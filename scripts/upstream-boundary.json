@@ -1,0 +1,36 @@
+{
+	"reviewedUpstreamSha": "75c2226e254a3870deea416ca20e78d66198ac70",
+	"upstreamOwnedFiles": [
+		".github/workflows/deploy.yml",
+		"src/ui/App.tsx",
+		"src/ui/ToolBar.tsx",
+		"src/ui/Dialog/AboutDialog.tsx",
+		"src/ui/IvCalc/IvCalcApp.tsx",
+		"src/ui/IvCalc/IvState.ts",
+		"src/ui/IvCalc/LowerTabHeader.tsx",
+		"src/ui/IvCalc/Strength/StrengthParameterForm.tsx",
+		"src/i18n/en/IvCalc.json",
+		"src/i18n/ja/IvCalc.json",
+		"src/i18n/ko/IvCalc.json",
+		"src/i18n/zh-CN/IvCalc.json",
+		"src/i18n/zh-TW/IvCalc.json",
+		"src/i18n/en/common.json",
+		"src/i18n/ja/common.json",
+		"src/i18n/ko/common.json",
+		"src/i18n/zh-CN/common.json",
+		"src/i18n/zh-TW/common.json"
+	],
+	"semanticReviewFiles": [
+		"src/index.tsx",
+		"src/i18n.ts",
+		"src/ui/App.tsx",
+		"src/ui/AppConfig.ts",
+		"src/ui/ToolBar.tsx",
+		"src/ui/Dialog/AboutDialog.tsx",
+		"src/ui/Dialog/SettingsDialog.tsx",
+		"src/ui/IvCalc/IvCalcApp.tsx",
+		"src/ui/IvCalc/IvState.ts",
+		"src/ui/IvCalc/LowerTabHeader.tsx",
+		"src/ui/IvCalc/Strength/StrengthParameterForm.tsx"
+	]
+}

@@ -36,32 +36,67 @@ runs only in `takus69/pokesleep-tool` on main pushes or manual dispatches.
 `artifacts/` directories are excluded from repository verification. These are
 workspace-owned directories and must not be edited or formatted.
 
+`RankingWorkspace.tsx` is a derived composition of upstream
+`src/ui/IvCalc/IvCalcApp.tsx`, not an independent implementation. It directly
+reuses the upstream IV reducer/state and Pokémon, box, parameter, rate, and
+dialog components. Therefore an upstream `IvCalcApp.tsx` change always requires
+a semantic review even when Git reports no merge conflict. Pay particular
+attention to reducer/state initialization, actions, save/restore behavior,
+dialogs, callbacks, and component props.
+
+Likewise, compare `RankingApp.tsx` with upstream `src/ui/App.tsx` whenever the
+upstream application shell changes. Review theme selection, language loading
+and change events, metadata/routes, configuration persistence, PWA/news
+behavior, and the contracts of components or reducers reused directly by the
+fork adapters. The semantic-drift check also watches `src/index.tsx`,
+`src/i18n.ts`, `src/ui/AppConfig.ts`, and
+`src/ui/Dialog/SettingsDialog.tsx`; changes there can affect fork startup,
+translation registration and switching, persisted configuration, or settings
+callbacks without touching the upstream-owned presentation files.
+
 ## Updating from upstream
 
-1. Fetch `upstream` and merge `upstream/main` into this fork's main branch.
-2. Resolve changes in upstream-owned files without copying fork-only behavior
-   into them.
-3. Review upstream API changes used by `src/fork/` and
-   `src/util/IngredientRanking.ts`.
-4. Confirm the upstream-owned files below still match `upstream/main`:
+1. Fetch and merge the current upstream branch:
 
    ```shell
-   git diff --exit-code upstream/main -- \
-     src/ui/App.tsx src/ui/ToolBar.tsx \
-     src/ui/IvCalc/IvCalcApp.tsx src/ui/IvCalc/IvState.ts \
-     src/ui/IvCalc/LowerTabHeader.tsx \
-     src/ui/IvCalc/Strength/StrengthParameterForm.tsx \
-     src/i18n/en/IvCalc.json src/i18n/ja/IvCalc.json \
-     src/i18n/ko/IvCalc.json src/i18n/zh-CN/IvCalc.json \
-     src/i18n/zh-TW/IvCalc.json
+   git fetch upstream
+   git merge upstream/main
    ```
 
-   Also compare `src/ui/Dialog/AboutDialog.tsx`, all five
-   `src/i18n/<language>/common.json` files, and
-   `.github/workflows/deploy.yml`; fork equivalents belong under `src/fork/`
-   or in `fork-deploy.yml`.
+2. Run the boundary and semantic-drift check:
 
-5. Run `npm run verify` and manually confirm the public ranking route, lower
+   ```shell
+   npm run verify:upstream-boundary
+   ```
+
+   The command verifies that all 18 upstream-owned files still match
+   `upstream/main`. It also compares integration-sensitive upstream files with
+   the reviewed SHA recorded in `scripts/upstream-boundary.json`.
+
+3. If semantic drift is reported, inspect the listed diff. Review
+   `IvCalcApp.tsx` and `App.tsx` using the rules above even if the merge was
+   conflict-free. Also review `IvState`, `LowerTabHeader`,
+   `StrengthParameterForm`, `ToolBar`, `AboutDialog`, `index.tsx`, `i18n.ts`,
+   `AppConfig.ts`, and `SettingsDialog.tsx` contracts.
+
+4. Apply required compatibility changes in `src/fork/` and, when calculation
+   behavior changed, in `src/util/IngredientRanking.ts` and its tests. Keep the
+   18 upstream-owned files identical to `upstream/main`.
+
+5. Update `reviewedUpstreamSha` in `scripts/upstream-boundary.json` to the full
+   SHA printed by `git rev-parse upstream/main` only after all reported changes
+   have been read, their behavioral impact has been assessed, required fork
+   adapters/tests have been updated, and the upstream-owned-file comparison is
+   clean. Do not update the SHA merely to make the check pass.
+
+6. Rerun the checks:
+
+   ```shell
+   npm run verify:upstream-boundary
+   npm run verify
+   ```
+
+7. Manually confirm the public ranking route, lower
    Pokémon/box/parameter tabs, settings language switch, and About/license
    links.
 
