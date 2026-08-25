@@ -29,18 +29,16 @@ const baseOptions = {
 } satisfies PokemonRankingOptions;
 
 describe("calculatePokemonRanking", () => {
-	test("uses fixed traits and returns one best ingredient pattern per Pokemon", () => {
+	test("uses fixed traits and returns every matching normal ingredient pattern", () => {
 		const result = calculatePokemonRanking({
 			...baseOptions,
 			filters: { type: "ghost", specialty: "Ingredients", ingredient: "apple" },
 			strengthCalculator: (iv) =>
-				strengthResult({
-					totalStrength:
-						iv.pokemonName === "Skeledirge" && iv.ingredient === "ABC"
-							? 10_000
-							: iv.pokemon.id,
-				}),
+				strengthResult({ totalStrength: iv.pokemon.id }),
 		});
+		const skeledirge = result.filter(
+			({ iv }) => iv.pokemonName === "Skeledirge",
+		);
 
 		expect(result.length).toBeGreaterThan(0);
 		expect(
@@ -55,13 +53,33 @@ describe("calculatePokemonRanking", () => {
 					entry.ingredientSlots.some((slot) => slot.name === "apple"),
 			),
 		).toBe(true);
-		expect(new Set(result.map((entry) => entry.iv.idForm)).size).toBe(
-			result.length,
+		expect(skeledirge.map((entry) => entry.ingredientKey)).toEqual([
+			"AAA",
+			"AAB",
+			"AAC",
+			"ABA",
+			"ABB",
+			"ABC",
+		]);
+		expect(new Set(skeledirge.map((entry) => entry.iv.idForm))).toEqual(
+			new Set([skeledirge[0].iv.idForm]),
 		);
-		expect(
-			result.find((entry) => entry.iv.pokemonName === "Skeledirge")
-				?.ingredientKey,
-		).toBe("ABC");
+	});
+
+	test("returns every mythical ingredient pattern independently", () => {
+		const result = calculatePokemonRanking({
+			...baseOptions,
+			filters: { type: "psychic", specialty: "All" },
+			strengthCalculator: (iv) =>
+				strengthResult({ totalStrength: iv.pokemon.id }),
+		});
+		const mew = result.filter(({ iv }) => iv.pokemonName === "Mew");
+
+		expect(mew).toHaveLength(392);
+		expect(new Set(mew.map((entry) => entry.ingredientKey)).size).toBe(392);
+		expect(mew.map((entry) => entry.ingredientOrder)).toEqual(
+			Array.from({ length: 392 }, (_, index) => index),
+		);
 	});
 
 	test.each<{
@@ -166,9 +184,13 @@ describe("calculatePokemonRanking", () => {
 			iv.pokemonName.startsWith("Toxtricity"),
 		);
 
-		expect(toxtricity).toHaveLength(1);
-		expect(toxtricity[0].iv.pokemonName).toBe("Toxtricity (Amped)");
-		expect(toxtricity[0].iv.nature.name).toBe("Hardy");
+		expect(toxtricity).toHaveLength(6);
+		expect(
+			toxtricity.every(
+				({ iv }) =>
+					iv.pokemonName === "Toxtricity (Amped)" && iv.nature.name === "Hardy",
+			),
+		).toBe(true);
 	});
 
 	test("sorts descending with stable Pokedex and form tie-breaks", () => {
@@ -181,10 +203,17 @@ describe("calculatePokemonRanking", () => {
 				}),
 		});
 
-		expect(result[0].iv.pokemonName).toBe("Persian");
-		expect(result.slice(1).map(({ pokemon }) => pokemon.id)).toEqual(
+		const firstNonPersian = result.findIndex(
+			({ iv }) => iv.pokemonName !== "Persian",
+		);
+		expect(
+			result.slice(0, firstNonPersian).map((entry) => entry.ingredientKey),
+		).toEqual(["AAA", "AAB", "ABA", "ABB"]);
+		expect(
+			result.slice(firstNonPersian).map(({ pokemon }) => pokemon.id),
+		).toEqual(
 			result
-				.slice(1)
+				.slice(firstNonPersian)
 				.map(({ pokemon }) => pokemon.id)
 				.sort((a, b) => a - b),
 		);

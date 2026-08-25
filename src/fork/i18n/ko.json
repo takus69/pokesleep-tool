@@ -42,7 +42,8 @@
 			"go to comparison rank": "순위로 이동",
 			"comparison unavailable": "계산 불가",
 			"ranking result range": "획득 수 그룹 {{start}}~{{end}} / 전체 {{groups}} (후보 {{total}}개)",
-			"cross ranking result range": "순위 그룹 {{start}}~{{end}} / 전체 {{groups}} (후보 {{total}}마리)",
+			"cross ranking result range": "순위 그룹 {{start}}~{{end}} / 전체 {{groups}} (후보 구성 {{total}}개)",
+			"cross ranking pattern note": "각 포켓몬의 모든 식재료 구성을 각각 별도의 후보로 랭킹합니다.",
 			"ranking uses selected levels": "랭킹 레벨과 비교 포켓몬의 실제 레벨을 사용합니다.",
 			"ingredient names": {
 				"leek": "대파",

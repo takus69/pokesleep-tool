@@ -42,7 +42,8 @@
 			"go to comparison rank": "Go to rank",
 			"comparison unavailable": "Cannot calculate",
 			"ranking result range": "Count groups {{start}}–{{end}} of {{groups}} ({{total}} candidates)",
-			"cross ranking result range": "Rank groups {{start}}–{{end}} of {{groups}} ({{total}} Pokémon)",
+			"cross ranking result range": "Rank groups {{start}}–{{end}} of {{groups}} ({{total}} candidate configurations)",
+			"cross ranking pattern note": "Every ingredient configuration for each Pokémon is ranked as a separate candidate.",
 			"ranking uses selected levels": "Uses the ranking level above and each comparison Pokémon's actual level.",
 			"ingredient names": {
 				"leek": "Leek",

@@ -42,7 +42,8 @@
 			"go to comparison rank": "順位へ移動",
 			"comparison unavailable": "計算不可",
 			"ranking result range": "取得数グループ {{start}}～{{end}} / 全{{groups}}（候補{{total}}件）",
-			"cross ranking result range": "順位グループ {{start}}～{{end}} / 全{{groups}}（候補{{total}}匹）",
+			"cross ranking result range": "順位グループ {{start}}～{{end}} / 全{{groups}}（候補構成{{total}}件）",
+			"cross ranking pattern note": "各ポケモンのすべての食材構成を、それぞれ別の候補としてランキングします。",
 			"ranking uses selected levels": "ランキング欄のレベルと比較個体の実レベルを使用します。",
 			"ingredient names": {
 				"leek": "長ねぎ",

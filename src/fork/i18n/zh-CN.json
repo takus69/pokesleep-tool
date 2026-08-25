@@ -42,7 +42,8 @@
 			"go to comparison rank": "前往排名",
 			"comparison unavailable": "无法计算",
 			"ranking result range": "获取数组 {{start}}～{{end}} / 共{{groups}}组（{{total}}个候选）",
-			"cross ranking result range": "排名组 {{start}}～{{end}} / 共{{groups}}组（{{total}}只候选）",
+			"cross ranking result range": "排名组 {{start}}～{{end}} / 共{{groups}}组（{{total}}个候选配置）",
+			"cross ranking pattern note": "每只宝可梦的所有食材配置都会分别作为独立候选参与排名。",
 			"ranking uses selected levels": "使用排名栏等级和比较宝可梦的实际等级。",
 			"ingredient names": {
 				"leek": "大葱",

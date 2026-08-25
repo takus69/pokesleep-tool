@@ -282,6 +282,9 @@ const CrossPokemonRankingView = React.memo(
 						))}
 					</SelectControl>
 				</StyledControls>
+				<StyledPatternNote>
+					{t(key("cross ranking pattern note"))}
+				</StyledPatternNote>
 
 				<Dialog
 					fullWidth
@@ -340,7 +343,7 @@ const CrossPokemonRankingView = React.memo(
 						pageGroups.flatMap((group, groupIndex) =>
 							group.entries.map((entry) => (
 								<RankingRow
-									key={entry.iv.pokemonName}
+									key={`${entry.iv.idForm}-${entry.ingredientKey}-${entry.ordinal}`}
 									entry={entry}
 									rank={pageStart + groupIndex + 1}
 									formatter={formatter}
@@ -501,6 +504,11 @@ const StyledNatureNote = styled("small")({
 	gridColumn: "1 / -1",
 	color: "#666",
 	fontSize: ".7rem",
+});
+const StyledPatternNote = styled("p")({
+	margin: "-.35rem 0 .65rem",
+	color: "#666",
+	fontSize: ".75rem",
 });
 const StyledControls = styled("div")({
 	display: "grid",

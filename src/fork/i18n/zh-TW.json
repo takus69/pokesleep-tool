@@ -42,7 +42,8 @@
 			"go to comparison rank": "前往名次",
 			"comparison unavailable": "無法計算",
 			"ranking result range": "獲取數群組 {{start}}～{{end}} / 共{{groups}}組（{{total}}個候選）",
-			"cross ranking result range": "排名群組 {{start}}～{{end}} / 共{{groups}}組（{{total}}隻候選）",
+			"cross ranking result range": "排名群組 {{start}}～{{end}} / 共{{groups}}組（{{total}}個候選配置）",
+			"cross ranking pattern note": "每隻寶可夢的所有食材配置都會分別作為獨立候選參與排名。",
 			"ranking uses selected levels": "使用排名欄等級與比較寶可夢的實際等級。",
 			"ingredient names": {
 				"leek": "大蔥",

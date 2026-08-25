@@ -72,11 +72,12 @@ export function calculatePokemonRanking(
 	const context = createPokemonRankingContext(options);
 	if (context === null) return [];
 
-	const bestByPokemon = new Map<string, PokemonRankingEntry>();
+	const entries: PokemonRankingEntry[] = [];
 	for (const candidate of context.candidates) {
-		selectPokemonRankingCandidate(bestByPokemon, candidate, context);
+		const entry = evaluatePokemonRankingCandidate(candidate, context);
+		if (entry !== null) entries.push(entry);
 	}
-	return sortPokemonRankingEntries([...bestByPokemon.values()]);
+	return sortPokemonRankingEntries(entries);
 }
 
 /** Async variant with abort checks and event-loop yielding. */
@@ -87,15 +88,16 @@ export async function calculatePokemonRankingAsync(
 	const context = createPokemonRankingContext(options);
 	if (context === null) return [];
 
-	const bestByPokemon = new Map<string, PokemonRankingEntry>();
+	const entries: PokemonRankingEntry[] = [];
 	for (const [index, candidate] of context.candidates.entries()) {
-		selectPokemonRankingCandidate(bestByPokemon, candidate, context);
+		const entry = evaluatePokemonRankingCandidate(candidate, context);
+		if (entry !== null) entries.push(entry);
 		if ((index + 1) % asyncYieldInterval === 0) {
 			await yieldToEventLoop(options.signal);
 		}
 	}
 	options.signal?.throwIfAborted();
-	return sortPokemonRankingEntries([...bestByPokemon.values()]);
+	return sortPokemonRankingEntries(entries);
 }
 
 export function groupPokemonRankingEntries(
@@ -149,16 +151,15 @@ function createPokemonRankingContext(
 	};
 }
 
-function selectPokemonRankingCandidate(
-	selected: Map<string, PokemonRankingEntry>,
+function evaluatePokemonRankingCandidate(
 	candidate: IngredientRankingCandidate,
 	context: PokemonRankingContext,
-): void {
+): PokemonRankingEntry | null {
 	if (
 		!matchesPokemonFilters(candidate.iv.pokemon, context.filters) ||
 		!isNatureCompatible(candidate.iv.pokemon, context.nature)
 	) {
-		return;
+		return null;
 	}
 
 	const iv = new PokemonIv({
@@ -166,14 +167,14 @@ function selectPokemonRankingCandidate(
 		nature: context.nature,
 		subSkills: context.subSkills,
 	});
-	if (iv.nature.name !== context.nature.name) return;
+	if (iv.nature.name !== context.nature.name) return null;
 	if (
 		context.filters.ingredient !== undefined &&
 		!getIngredientSlots(iv).some(
 			(slot) => slot.name === context.filters.ingredient,
 		)
 	) {
-		return;
+		return null;
 	}
 
 	const result = calculatePokemonRankingStrengthResult(
@@ -181,13 +182,13 @@ function selectPokemonRankingCandidate(
 		context.parameter,
 		context.calculator,
 	);
-	if (result === null) return;
+	if (result === null) return null;
 	const value = evaluateNumericRankingValue(
 		getPokemonRankingValue(result, context.target, context.ingredient),
 	);
-	if (value === null) return;
+	if (value === null) return null;
 
-	const entry: PokemonRankingEntry = {
+	return {
 		iv,
 		pokemon: iv.pokemon,
 		ingredientSlots: getIngredientSlots(iv),
@@ -196,16 +197,6 @@ function selectPokemonRankingCandidate(
 		ordinal: candidate.ordinal,
 		value,
 	};
-	const pokemonKey = `${iv.pokemon.id}:${iv.form}`;
-	const current = selected.get(pokemonKey);
-	if (
-		current === undefined ||
-		entry.value > current.value ||
-		(entry.value === current.value &&
-			comparePokemonRankingEntryTies(entry, current) < 0)
-	) {
-		selected.set(pokemonKey, entry);
-	}
 }
 
 function matchesPokemonFilters(
