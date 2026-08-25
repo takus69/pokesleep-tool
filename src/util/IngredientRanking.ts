@@ -3,6 +3,11 @@ import pokemons, {
 	type PokemonData,
 } from "../data/pokemons";
 import Nature from "./Nature";
+import {
+	evaluateNumericRankingValue,
+	groupNumericRankingEntries,
+	stableSortNumericRankingEntries,
+} from "./NumericRanking";
 import PokemonIv, { type IngredientSlot } from "./PokemonIv";
 import { type IngredientType, IngredientTypes } from "./PokemonRp";
 import PokemonStrength, {
@@ -18,6 +23,7 @@ export type IngredientRankingStrengthResult = {
 	ingredients: IngredientStrength[];
 	totalStrength?: number;
 	berryTotalStrength?: number;
+	ingStrength?: number;
 	skillCount?: number;
 };
 
@@ -249,15 +255,16 @@ export function evaluatePokemonIngredient(
 	if (!unlockedSlots.some((slot) => slot.name === ingredient)) {
 		return { status: "zero", count: 0 };
 	}
+	const result = calculatePokemonRankingStrengthResult(
+		iv,
+		parameter,
+		strengthCalculator,
+	);
+	if (result === null) return { status: "uncalculable" };
 	try {
-		const rankingParameter = {
-			...parameter,
-			level: 0,
-		} satisfies StrengthParameter;
-		const result = strengthCalculator(iv, rankingParameter);
 		const count =
 			result.ingredients.find((item) => item.name === ingredient)?.count ?? 0;
-		if (!Number.isFinite(count) || count < 0) {
+		if (evaluateNumericRankingValue(count) === null) {
 			return { status: "uncalculable" };
 		}
 		return count > 0
@@ -289,18 +296,15 @@ export function evaluatePokemonRankingTarget(
 				);
 	}
 
-	const unlockedSlots = getUnlockedIngredientSlots(iv);
-	if (unlockedSlots === null || !isIvCalculable(iv, parameter, unlockedSlots)) {
-		return { status: "uncalculable" };
-	}
+	const result = calculatePokemonRankingStrengthResult(
+		iv,
+		parameter,
+		strengthCalculator,
+	);
+	if (result === null) return { status: "uncalculable" };
 	try {
-		const rankingParameter = {
-			...parameter,
-			level: 0,
-		} satisfies StrengthParameter;
-		const result = strengthCalculator(iv, rankingParameter);
 		const count = getRankingTargetValue(result, target);
-		if (!Number.isFinite(count) || count < 0) {
+		if (evaluateNumericRankingValue(count) === null) {
 			return { status: "uncalculable" };
 		}
 		return count > 0
@@ -308,6 +312,23 @@ export function evaluatePokemonRankingTarget(
 			: { status: "zero", count: 0 };
 	} catch {
 		return { status: "uncalculable" };
+	}
+}
+
+/** Calculate one IV with its own level, returning null when it is invalid. */
+export function calculatePokemonRankingStrengthResult(
+	iv: PokemonIv,
+	parameter: StrengthParameter,
+	strengthCalculator: IngredientRankingStrengthCalculator = defaultStrengthCalculator,
+): IngredientRankingStrengthResult | null {
+	const unlockedSlots = getUnlockedIngredientSlots(iv);
+	if (unlockedSlots === null || !isIvCalculable(iv, parameter, unlockedSlots)) {
+		return null;
+	}
+	try {
+		return strengthCalculator(iv, { ...parameter, level: 0 });
+	} catch {
+		return null;
 	}
 }
 
@@ -340,19 +361,11 @@ export function createIngredientRankingBaselineIv(
 export function groupIngredientRankingEntries(
 	entries: readonly IngredientRankingEntry[],
 ): IngredientRankingCountGroup[] {
-	const groups: IngredientRankingCountGroup[] = [];
-	for (const entry of [...entries].sort(compareIngredientRankingEntries)) {
-		const last = groups.at(-1);
-		if (last?.count === entry.count) {
-			groups[groups.length - 1] = {
-				...last,
-				entries: [...last.entries, entry],
-			};
-		} else {
-			groups.push({ count: entry.count, entries: [entry] });
-		}
-	}
-	return groups;
+	return groupNumericRankingEntries(
+		entries,
+		(entry) => entry.metric.count,
+		compareIngredientRankingEntryTies,
+	).map((group) => ({ count: group.value, entries: group.entries }));
 }
 
 /**
@@ -695,11 +708,15 @@ function finalizeRankingEntries(
 	entries: IngredientRankingEntry[],
 	limit?: number,
 ): IngredientRankingEntry[] {
-	entries.sort(compareIngredientRankingEntries);
+	const sorted = stableSortNumericRankingEntries(
+		entries,
+		(entry) => entry.metric.count,
+		compareIngredientRankingEntryTies,
+	);
 	if (limit === undefined || !Number.isFinite(limit)) {
-		return entries;
+		return sorted;
 	}
-	return entries.slice(0, Math.max(0, Math.floor(limit)));
+	return sorted.slice(0, Math.max(0, Math.floor(limit)));
 }
 
 async function yieldToEventLoop(signal?: AbortSignal): Promise<void> {
@@ -735,7 +752,15 @@ export function compareIngredientRankingEntries(
 	b: IngredientRankingEntry,
 ): number {
 	return (
-		b.metric.count - a.metric.count ||
+		b.metric.count - a.metric.count || compareIngredientRankingEntryTies(a, b)
+	);
+}
+
+function compareIngredientRankingEntryTies(
+	a: IngredientRankingEntry,
+	b: IngredientRankingEntry,
+): number {
+	return (
 		a.iv.pokemon.id - b.iv.pokemon.id ||
 		a.iv.form - b.iv.form ||
 		a.ingredientOrder - b.ingredientOrder ||

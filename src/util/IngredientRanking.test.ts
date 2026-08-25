@@ -532,6 +532,42 @@ describe("comparison calculation layer", () => {
 		).toEqual({ status: "uncalculable" });
 	});
 
+	test("returns uncalculable before checking an absent target when the rate is unknown", () => {
+		const calculator = vi.fn(() => strengthResult([]));
+		const iv = new PokemonIv({
+			pokemonName: "Mew",
+			level: 1,
+			mythIng1: "egg",
+			mythIng2: "egg",
+			mythIng3: "egg",
+		});
+		const unknownRateParameter = {
+			...parameter,
+			mew: { ...parameter.mew, ing: Number.NaN },
+		};
+
+		expect(
+			evaluatePokemonIngredient(iv, "apple", unknownRateParameter, calculator),
+		).toEqual({ status: "uncalculable" });
+		expect(calculator).not.toHaveBeenCalled();
+	});
+
+	test("returns uncalculable before checking an absent target when an unlocked slot is unknown", () => {
+		const calculator = vi.fn(() => strengthResult([]));
+		const iv = new PokemonIv({
+			pokemonName: "Darkrai",
+			level: 60,
+			mythIng1: "apple",
+			mythIng2: "herb",
+			mythIng3: "unknown",
+		});
+
+		expect(
+			evaluatePokemonIngredient(iv, "milk", parameter, calculator),
+		).toEqual({ status: "uncalculable" });
+		expect(calculator).not.toHaveBeenCalled();
+	});
+
 	test("evaluates comparison Pokemon with the selected non-ingredient metric", () => {
 		const iv = candidateFor("Skeledirge", "AAA", 60).iv;
 
