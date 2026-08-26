@@ -107,3 +107,13 @@ change `AppConfig`, IV state/actions, the lower tab contract, strength parameter
 props, translation loading, or application metadata/routes. Make those adapter
 changes in `src/fork/` whenever possible and keep the upstream-owned files
 unchanged.
+
+## Ranking redesign specification
+
+The planned ranking redesign is documented in
+[Ranking scenarios and handoff design](ranking-scenarios.md) (Japanese).
+It records confirmed requirements and implementation proposals for a unified
+six-purpose ranking flow; all major user decisions have been resolved. The
+redesign is not yet implemented. This specification is not a description of
+current application behavior or an instruction to remove existing
+implementations immediately.
