@@ -953,7 +953,7 @@ function getRankingNatures(
 	});
 }
 
-function getIngredientCalculationCacheKey(
+export function getIngredientCalculationCacheKey(
 	nature: Nature,
 	activeSubSkills: readonly SubSkill[],
 ): string {
@@ -973,7 +973,7 @@ function getIngredientCalculationCacheKey(
 	].join(":");
 }
 
-function generateNormalPatterns(pokemon: PokemonData): Array<{
+export function generateNormalPatterns(pokemon: PokemonData): Array<{
 	key: IngredientType;
 	order: number;
 	props: { ingredient: IngredientType };
@@ -985,7 +985,7 @@ function generateNormalPatterns(pokemon: PokemonData): Array<{
 	);
 }
 
-function generateMythicalPatterns(pokemon: PokemonData): Array<{
+export function generateMythicalPatterns(pokemon: PokemonData): Array<{
 	key: string;
 	order: number;
 	props: {

@@ -1,6 +1,6 @@
 # Fork customizations
 
-This fork publishes an ingredient-ranking-focused application while continuing
+This fork publishes a ranking-focused application while continuing
 to use upstream Pokémon Sleep calculations, data, state, and shared UI.
 
 ## Boundary
@@ -8,19 +8,27 @@ to use upstream Pokémon Sleep calculations, data, state, and shared UI.
 Fork-specific presentation code lives in `src/fork/`:
 
 - `RankingApp.tsx` fixes the public application to the IV/ranking experience.
-- `RankingWorkspace.tsx` composes the ranking view with the upstream Pokémon,
-  box, and parameter panels.
+- `RankingWorkspace.tsx` composes the ranking view with the upstream Pokémon
+  editor and box inside the optional comparison dialog. Shared environment
+  controls are opened from the ranking flow, not a second permanent lower panel.
 - `RankingToolBar.tsx` removes the upstream application switcher.
 - `RankingAboutDialog.tsx` keeps fork attribution, license, and support links
   out of the upstream About dialog.
-- `RankingLowerTabHeader.tsx` adapts the upstream lower tabs so the parameter
-  tab remains available in the ranking-only workspace.
-- `IngredientRankingView.tsx` contains the ranking UI.
-- `i18n/` contains namespaced `fork.ingredientRanking.*` and `fork.about.*`
+- `RankingScenarioView.tsx`, `RankingScenarioOptions.tsx`, and
+  `RankingScenarioResults.tsx` compose the unified six-purpose ranking flow.
+- `RankingScenarioState.ts` and `useRankingScenario.ts` own purpose-specific
+  settings, explicit calculation, cancellation, and result freshness.
+- `RankingEnvironmentForm.tsx` and `RankingEnvironmentDialog.tsx` adapt the
+  existing strength-parameter controls without individual overrides.
+- `i18n/` contains namespaced `fork.scenario.*`, `fork.ingredientRanking.*`, and `fork.about.*`
   translations, registered by `src/fork/i18n.ts`.
 
-Fork-specific calculation logic remains in `src/util/IngredientRanking.ts` with
-its co-located test. The application entry point, `src/index.tsx`, is the only
+Fork-specific calculation logic lives in `src/util/RankingScenario.ts` with
+its co-located test. It reuses the existing ranking utilities for ingredient
+patterns, trait enumeration, numeric sorting, and effect signatures. The legacy
+`IngredientRanking.ts` and `PokemonRanking.ts` APIs remain covered by their
+existing tests for compatibility; their old best-pattern selection and broad
+filters are not the behavior contract for the new unified UI. The application entry point, `src/index.tsx`, is the only
 upstream startup file that selects the fork application and registers its
 translations.
 
@@ -54,6 +62,27 @@ fork adapters. The semantic-drift check also watches `src/index.tsx`,
 translation registration and switching, persisted configuration, or settings
 callbacks without touching the upstream-owned presentation files.
 
+`RankingEnvironmentForm.tsx` is a derived composition of upstream
+`src/ui/IvCalc/Strength/StrengthParameterForm.tsx`. Review it when that upstream
+form or its child controls change, even without a textual conflict. It reuses
+the upstream environment components but does not expose the old `level`,
+`evolved`, or `maxSkillLevel` individual overrides. The ranking calculation
+adapter neutralizes these three fields without overwriting their persisted
+upstream values. Candidate normal skill levels already include Skill Level Up;
+event and Expert bonuses and skill caps remain upstream calculations.
+`preserveRankingIndividualSettings` also adapts `changeParameter` callbacks
+from reused individual/box controls: sanitized parameters passed to their views
+must not accidentally replace the persisted legacy override fields. Review both
+the parameters passed into upstream components and the actions returned by them.
+
+Purpose-specific settings use the separate localStorage key
+`PstForkRankingScenarios.v1`. It stores the active purpose and one configuration
+per purpose; first-use main conditions are unselected. The island/favorite
+berries and other environment settings remain exclusively in the existing IV
+state storage. A ranking reset only resets the current purpose. Existing box,
+individual, environment, and legacy ranking storage is not deleted or rewritten
+as a migration. Comparison individuals remain independent of candidate settings.
+
 ## Updating from upstream
 
 1. Fetch and merge the current upstream branch:
@@ -80,7 +109,7 @@ callbacks without touching the upstream-owned presentation files.
    `AppConfig.ts`, and `SettingsDialog.tsx` contracts.
 
 4. Apply required compatibility changes in `src/fork/` and, when calculation
-   behavior changed, in `src/util/IngredientRanking.ts` and its tests. Keep the
+   behavior changed, in the fork ranking utilities and their tests. Keep the
    18 upstream-owned files identical to `upstream/main`.
 
 5. Update `reviewedUpstreamSha` in `scripts/upstream-boundary.json` to the full
@@ -96,9 +125,10 @@ callbacks without touching the upstream-owned presentation files.
    npm run verify
    ```
 
-7. Manually confirm the public ranking route, lower
-   Pokémon/box/parameter tabs, settings language switch, and About/license
-   links.
+7. Manually confirm the public ranking route and six-purpose flow, the optional
+   comparison dialog's Pokémon/box tabs, the shared environment dialog, settings
+   language switch, and About/license links. Check that closing/reopening either
+   dialog preserves its data and does not create a second environment editor.
 
 ## Expected integration points
 
@@ -110,10 +140,11 @@ unchanged.
 
 ## Ranking redesign specification
 
-The planned ranking redesign is documented in
+The ranking redesign is documented in
 [Ranking scenarios and handoff design](ranking-scenarios.md) (Japanese).
 It records confirmed requirements and implementation proposals for a unified
 six-purpose ranking flow; all major user decisions have been resolved. The
-redesign is not yet implemented. This specification is not a description of
-current application behavior or an instruction to remove existing
-implementations immediately.
+implementation now maps those requirements to the scenario UI, purpose-specific
+state, and shared evaluation pipeline described above. Integration verification
+and browser acceptance checks must still be completed before declaring the
+redesign finished; focused calculation tests alone do not prove UI completion.

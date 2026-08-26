@@ -1,0 +1,430 @@
+/** Fork adapter of StrengthParameterForm: shared environment only. Review upstream changes semantically. */
+import {
+	Button,
+	Collapse,
+	Dialog,
+	DialogActions,
+	DialogContent,
+	DialogTitle,
+	MenuItem,
+	Select,
+	type SelectChangeEvent,
+	Snackbar,
+	Switch,
+	ToggleButton,
+	ToggleButtonGroup,
+} from "@mui/material";
+import { styled } from "@mui/system";
+import React from "react";
+import { useTranslation } from "react-i18next";
+import { getActiveHelpBonus } from "../data/events";
+import MessageDialog from "../ui/Dialog/MessageDialog";
+import InfoButton from "../ui/IvCalc/InfoButton";
+import type { IvAction } from "../ui/IvCalc/IvState";
+import OtherTeamMemberForm from "../ui/IvCalc/Panel/OtherTeamMemberForm";
+import RecipeBonusLevelForm from "../ui/IvCalc/Panel/RecipeBonusLevelForm";
+import AreaControlGroup from "../ui/IvCalc/Strength/AreaControlGroup";
+import EventConfigDialog from "../ui/IvCalc/Strength/EventConfigDialog";
+import PeriodSelect from "../ui/IvCalc/Strength/PeriodSelect";
+import TapFrequencyControl from "../ui/IvCalc/Strength/TapFrequencyControl";
+import { NoTap, whistlePeriod } from "../util/Energy";
+import type { PokemonBoxItem } from "../util/PokemonBox";
+import {
+	createStrengthParameter,
+	type StrengthParameter,
+} from "../util/PokemonStrength";
+
+const StyledSettingForm = styled("div")({
+	padding: "0 1rem",
+	marginBottom: "1rem",
+	"& section": {
+		margin: "0.2rem 0",
+		fontSize: ".9rem",
+		display: "flex",
+		flex: "0 auto",
+		"&.mt": {
+			marginTop: "1rem",
+		},
+		"& > span.lbl": {
+			marginRight: "auto",
+			marginTop: 0,
+			textWrap: "wrap",
+		},
+		"& > span > button": {
+			marginRight: 0,
+		},
+		"& > .MuiInput-underline": {
+			fontSize: "0.9rem",
+		},
+		"& div.MuiToggleButtonGroup-root > button": {
+			fontSize: "0.75rem",
+			padding: "0.5rem 0.2rem",
+			lineHeight: 1.1,
+			maxWidth: "7rem",
+		},
+	},
+	"& > button": {
+		marginLeft: "-.4rem",
+	},
+});
+
+const RankingEnvironmentForm = React.memo(
+	({
+		dispatch,
+		value,
+		items,
+		hasHelpingBonus,
+	}: {
+		dispatch: React.Dispatch<IvAction>;
+		value: StrengthParameter;
+		items: PokemonBoxItem[];
+		hasHelpingBonus: boolean;
+	}) => {
+		const { t } = useTranslation();
+		const [helpOpen, setHelpOpen] = React.useState(false);
+		const [helpMessage, setHelpMessage] = React.useState<React.ReactNode>(null);
+		const [eventDetailOpen, setEventDetailOpen] = React.useState(false);
+		const [initializeConfirmOpen, setInitializeConfirmOpen] =
+			React.useState(false);
+
+		const onPityProcHelpClick = React.useCallback(() => {
+			setHelpMessage(
+				<>
+					<p>{t("pity proc help")}</p>
+					<p>{t("pity proc help2")}</p>
+				</>,
+			);
+			setHelpOpen(true);
+		}, [t]);
+		const addHelpingBonusEffectInfoClick = React.useCallback(() => {
+			setHelpMessage(
+				<>
+					<p>{t("helping bonus addition desc")}</p>
+					<p>{t("other member calculation")}</p>
+				</>,
+			);
+			setHelpOpen(true);
+		}, [t]);
+		const onPityProcHelpClose = React.useCallback(() => {
+			setHelpOpen(false);
+		}, []);
+
+		const onChange = React.useCallback(
+			(value: StrengthParameter) => {
+				dispatch({ type: "changeParameter", payload: { parameter: value } });
+			},
+			[dispatch],
+		);
+
+		const onHelpBonusCountChange = React.useCallback(
+			(e: SelectChangeEvent) => {
+				onChange({
+					...value,
+					helpBonusCount: parseInt(e.target.value, 10) as 0 | 1 | 2 | 3 | 4,
+				});
+			},
+			[onChange, value],
+		);
+		const onAddHelpingBonusEffectChange = React.useCallback(
+			(e: React.ChangeEvent<HTMLInputElement>) => {
+				onChange({ ...value, addHelpingBonusEffect: e.target.checked });
+			},
+			[onChange, value],
+		);
+		const onPityProcChange = React.useCallback(
+			(e: React.ChangeEvent<HTMLInputElement>) => {
+				onChange({ ...value, pityProc: e.target.checked });
+			},
+			[onChange, value],
+		);
+		const onEventChange = React.useCallback(
+			(_: React.MouseEvent, val: string | null) => {
+				if (val === null) {
+					return;
+				}
+				if (val === "advanced") {
+					val = "custom";
+				}
+				onChange({ ...value, event: val });
+			},
+			[onChange, value],
+		);
+		const onEventDetailClick = React.useCallback(() => {
+			setEventDetailOpen(true);
+		}, []);
+		const onEventDetailClose = React.useCallback(() => {
+			setEventDetailOpen(false);
+		}, []);
+		const onTapFrequencyAwakeChange = React.useCallback(
+			(tapFrequencyAwake: number) => {
+				onChange({ ...value, tapFrequencyAwake });
+			},
+			[onChange, value],
+		);
+		const onTapFrequencyAsleepChange = React.useCallback(
+			(tapFrequencyAsleep: number) => {
+				onChange({ ...value, tapFrequencyAsleep });
+			},
+			[onChange, value],
+		);
+		const onEditEnergyClick = React.useCallback(() => {
+			dispatch({ type: "openEnergyDialog" });
+		}, [dispatch]);
+		const onInitializeClick = React.useCallback(() => {
+			setInitializeConfirmOpen(true);
+		}, []);
+		const onInitializeConfirmClose = React.useCallback(() => {
+			setInitializeConfirmOpen(false);
+		}, []);
+
+		const scheduledEvents = getActiveHelpBonus(new Date())
+			.map((x) => x.name)
+			.reverse();
+		let prevEventName = "";
+		const eventToggles = ["none", ...scheduledEvents, "advanced"].map((x) => {
+			let curEventName = t(`events.${x}`);
+			if (
+				prevEventName.replace(/\(.*/, "") === curEventName.replace(/\(.*/, "")
+			) {
+				curEventName = curEventName.replace(/.*\(/, "").replace(")", "");
+			}
+			prevEventName = curEventName;
+			return (
+				<ToggleButton key={x} value={x} style={{ textTransform: "none" }}>
+					{curEventName}
+				</ToggleButton>
+			);
+		});
+		const eventName = ["none", ...scheduledEvents].includes(value.event)
+			? value.event
+			: "advanced";
+
+		const isNotWhistle = value.period !== whistlePeriod;
+		return (
+			<StyledSettingForm>
+				<section>
+					<span className="lbl">{t("period")}:</span>
+					<PeriodSelect dispatch={dispatch} value={value} />
+				</section>
+				<AreaControlGroup value={value} onChange={onChange} />
+				<section className="mt">
+					<span className="lbl">{t("event")}:</span>
+					<div
+						style={{
+							display: "flex",
+							flexDirection: "column",
+							alignItems: "flex-end",
+						}}
+					>
+						<ToggleButtonGroup
+							size="small"
+							exclusive
+							value={eventName}
+							onChange={onEventChange}
+						>
+							{eventToggles}
+						</ToggleButtonGroup>
+						<Collapse in={eventName === "advanced"}>
+							<Button onClick={onEventDetailClick}>
+								{t("configure event details")}
+							</Button>
+						</Collapse>
+					</div>
+				</section>
+				<section>
+					<span className="lbl">
+						{t("include pity proc")}:
+						<InfoButton onClick={onPityProcHelpClick} />
+					</span>
+					<Switch checked={value.pityProc} onChange={onPityProcChange} />
+				</section>
+				<section className="mt">
+					<span className="lbl">{t("helping bonus")}:</span>
+					<Select
+						variant="standard"
+						value={value.helpBonusCount.toString()}
+						onChange={onHelpBonusCountChange}
+					>
+						<MenuItem value={0}>{hasHelpingBonus ? "×1" : t("none")}</MenuItem>
+						<MenuItem value={1}>{hasHelpingBonus ? "×2" : "×1"}</MenuItem>
+						<MenuItem value={2}>{hasHelpingBonus ? "×3" : "×2"}</MenuItem>
+						<MenuItem value={3}>{hasHelpingBonus ? "×4" : "×3"}</MenuItem>
+						<MenuItem value={4}>{hasHelpingBonus ? "×5" : "×4"}</MenuItem>
+					</Select>
+				</section>
+				<section>
+					<span className="lbl">
+						{t("helping bonus addition label")}:
+						<InfoButton onClick={addHelpingBonusEffectInfoClick} />
+					</span>
+					<Switch
+						checked={value.addHelpingBonusEffect}
+						onChange={onAddHelpingBonusEffectChange}
+					/>
+				</section>
+				<OtherTeamMemberForm
+					parameter={value}
+					dispatch={dispatch}
+					items={items}
+				/>
+				<Collapse in={isNotWhistle}>
+					<section className="mt">
+						<span className="lbl">
+							{t("tap frequency")} ({t("awake")}):
+						</span>
+						<TapFrequencyControl
+							max={10}
+							value={value.tapFrequencyAwake}
+							onChange={onTapFrequencyAwakeChange}
+						/>
+					</section>
+					<section>
+						<span className="lbl">
+							{t("tap frequency")} ({t("asleep")}):
+						</span>
+						{value.tapFrequencyAwake === NoTap ? (
+							<span style={{ fontSize: "0.9rem" }}>{t("none")}</span>
+						) : (
+							<TapFrequencyControl
+								max={8}
+								value={value.tapFrequencyAsleep}
+								onChange={onTapFrequencyAsleepChange}
+							/>
+						)}
+					</section>
+					<section className="mt">
+						<span className="lbl">{t("energy")}:</span>
+						<Button onClick={onEditEnergyClick}>{t("edit")}</Button>
+					</section>
+				</Collapse>
+				<RecipeBonusLevelForm value={value} onChange={onChange} />
+				{["Berries", "Ingredients", "Skills"].map((specialty, index) => (
+					<section key={specialty}>
+						<span className="lbl">
+							{t("fork.scenario.total component", {
+								component: t(`fork.ingredientRanking.specialty ${specialty}`),
+							})}
+						</span>
+						<Switch
+							checked={value.totalFlags[index]}
+							onChange={(_event, checked) => {
+								const totalFlags = [...value.totalFlags];
+								totalFlags[index] = checked;
+								onChange({ ...value, totalFlags });
+							}}
+						/>
+					</section>
+				))}
+				<section className="mt">
+					<Button onClick={onInitializeClick} variant="outlined">
+						{t("initialize all parameters")}
+					</Button>
+				</section>
+				<InitializeConfirmDialog
+					open={initializeConfirmOpen}
+					onClose={onInitializeConfirmClose}
+					dispatch={dispatch}
+					value={value}
+				/>
+				<MessageDialog
+					open={helpOpen}
+					onClose={onPityProcHelpClose}
+					message={helpMessage}
+				/>
+				<EventConfigDialog
+					open={eventDetailOpen}
+					onClose={onEventDetailClose}
+					value={value}
+					onChange={onChange}
+				/>
+			</StyledSettingForm>
+		);
+	},
+);
+
+const InitializeConfirmDialog = React.memo(
+	({
+		dispatch,
+		value,
+		open,
+		onClose,
+	}: {
+		dispatch: React.Dispatch<IvAction>;
+		value: StrengthParameter;
+		open: boolean;
+		onClose: () => void;
+	}) => {
+		const [snackBarVisible, setSnackBarVisible] = React.useState(false);
+		const { t } = useTranslation();
+
+		const onInitialize = React.useCallback(() => {
+			dispatch({
+				type: "changeParameter",
+				payload: {
+					parameter: resetRankingEnvironment(value),
+				},
+			});
+			setSnackBarVisible(true);
+			onClose();
+		}, [dispatch, onClose, value]);
+		const onSnackbarClose = React.useCallback(() => {
+			setSnackBarVisible(false);
+		}, []);
+
+		return (
+			<>
+				<Dialog open={open} onClose={onClose}>
+					<DialogTitle>{t("initialize all parameters")}</DialogTitle>
+					<DialogContent>
+						<p style={{ fontSize: "0.9rem", margin: 0 }}>
+							{t("initialize all parameters message")}
+						</p>
+					</DialogContent>
+					<DialogActions>
+						<Button onClick={onInitialize} color="error">
+							{t("reset")}
+						</Button>
+						<Button onClick={onClose}>{t("cancel")}</Button>
+					</DialogActions>
+				</Dialog>
+				<Snackbar
+					open={snackBarVisible}
+					autoHideDuration={2000}
+					onClose={onSnackbarClose}
+					message={t("initialized all parameters")}
+				/>
+			</>
+		);
+	},
+);
+
+export function resetRankingEnvironment(
+	value: StrengthParameter,
+): StrengthParameter {
+	return createStrengthParameter({
+		level: value.level,
+		evolved: value.evolved,
+		maxSkillLevel: value.maxSkillLevel,
+	});
+}
+
+/** Calculators see independent IVs, but adapters must preserve legacy stored settings. */
+export function preserveRankingIndividualSettings(
+	action: IvAction,
+	parameter: StrengthParameter,
+): IvAction {
+	if (action.type !== "changeParameter") return action;
+	return {
+		...action,
+		payload: {
+			parameter: {
+				...action.payload.parameter,
+				level: parameter.level,
+				evolved: parameter.evolved,
+				maxSkillLevel: parameter.maxSkillLevel,
+			},
+		},
+	};
+}
+
+export default RankingEnvironmentForm;

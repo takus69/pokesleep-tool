@@ -1,8 +1,12 @@
 import {
 	Button,
+	Dialog,
+	DialogActions,
+	DialogContent,
+	DialogTitle,
 	Snackbar,
-	ToggleButton,
-	ToggleButtonGroup,
+	Tab,
+	Tabs,
 } from "@mui/material";
 import React from "react";
 import { useTranslation } from "react-i18next";
@@ -12,33 +16,24 @@ import BoxImportDialog from "../ui/IvCalc/Box/BoxImportDialog";
 import BoxItemDialog from "../ui/IvCalc/Box/BoxItemDialog";
 import BoxTabChild from "../ui/IvCalc/Box/BoxTabChild";
 import IvForm from "../ui/IvCalc/IvForm/IvForm";
-import { getInitialIvState, ivStateReducer } from "../ui/IvCalc/IvState";
+import { getInitialIvState } from "../ui/IvCalc/IvState";
 import RateNotFixedPanel from "../ui/IvCalc/RateNotFixedPanel";
-import StrengthSettingForm from "../ui/IvCalc/Strength/StrengthParameterForm";
 import type { PokemonBoxItem } from "../util/PokemonBox";
-import PokemonIv from "../util/PokemonIv";
-import CrossPokemonRankingView, {
-	type CrossPokemonRankingConfig,
-} from "./CrossPokemonRankingView";
-import IngredientRankingView from "./IngredientRankingView";
-import RankingLowerTabHeader from "./RankingLowerTabHeader";
+import type PokemonIv from "../util/PokemonIv";
+import { createRankingEnvironment } from "../util/RankingScenario";
+import { preserveRankingIndividualSettings } from "./RankingEnvironmentForm";
+import RankingScenarioView from "./RankingScenarioView";
+import { rankingWorkspaceReducer } from "./RankingWorkspaceState";
 
 const initialIvState = getInitialIvState();
 
 const RankingWorkspace = React.memo(() => {
-	const [state, dispatch] = React.useReducer(ivStateReducer, initialIvState);
-	const [rankingMode, setRankingMode] = React.useState<"traits" | "pokemon">(
-		"traits",
+	const [state, dispatch] = React.useReducer(
+		rankingWorkspaceReducer,
+		initialIvState,
 	);
-	const [crossPokemonRankingConfig, setCrossPokemonRankingConfig] =
-		React.useState<CrossPokemonRankingConfig>(() => ({
-			fixedIv: new PokemonIv({ pokemonName: "Skeledirge", level: 60 }),
-			target: "totalStrength",
-			targetIngredient: "apple",
-			filterIngredient: "",
-			filterType: "",
-			filterSpecialty: "",
-		}));
+	const [comparisonActive, setComparisonActive] = React.useState(false);
+	const [comparisonEditorOpen, setComparisonEditorOpen] = React.useState(false);
 	const { t } = useTranslation();
 	const selectedItem = state.box.getById(state.selectedItemId);
 
@@ -77,93 +72,102 @@ const RankingWorkspace = React.memo(() => {
 		[],
 	);
 
+	const individualDispatch = React.useCallback(
+		(action: import("../ui/IvCalc/IvState").IvAction) => {
+			dispatch(preserveRankingIndividualSettings(action, state.parameter));
+		},
+		[state.parameter],
+	);
+
 	const isSelectedItemEdited =
 		selectedItem !== null && !selectedItem.iv.isEqual(state.pokemonIv);
 
 	return (
 		<>
-			<div
-				style={{
-					padding: "0 .5rem",
-					position: "sticky",
-					top: 0,
-					zIndex: 1,
-					background: "#f9f9f9",
-				}}
-			>
-				<ToggleButtonGroup
-					exclusive
-					fullWidth
+			<div style={{ display: "flex", justifyContent: "flex-end" }}>
+				<Button
 					size="small"
-					value={rankingMode}
-					onChange={(_event, value: "traits" | "pokemon" | null) => {
-						if (value !== null) setRankingMode(value);
+					onClick={() => {
+						dispatch({ type: "changeLowerTab", payload: { index: 0 } });
+						setComparisonEditorOpen(true);
 					}}
-					aria-label={t("fork.ingredientRanking.ranking mode")}
-					style={{ marginBottom: ".6rem" }}
 				>
-					<ToggleButton value="traits">
-						{t("fork.ingredientRanking.trait ranking")}
-					</ToggleButton>
-					<ToggleButton value="pokemon">
-						{t("fork.ingredientRanking.cross pokemon ranking")}
-					</ToggleButton>
-				</ToggleButtonGroup>
-				{rankingMode === "traits" ? (
-					<IngredientRankingView state={state} dispatch={dispatch} />
-				) : (
-					<CrossPokemonRankingView
-						state={state}
-						dispatch={dispatch}
-						config={crossPokemonRankingConfig}
-						onConfigChange={setCrossPokemonRankingConfig}
-					/>
-				)}
-				{rankingMode === "traits" && (
-					<>
-						<RateNotFixedPanel state={state} dispatch={dispatch} />
-						<RankingLowerTabHeader
-							state={state}
-							dispatch={dispatch}
-							isBoxEmpty={state.box.items.length === 0}
-						/>
-					</>
-				)}
+					{t("pokemon")}
+				</Button>
+				<Button
+					size="small"
+					onClick={() => {
+						dispatch({ type: "changeLowerTab", payload: { index: 1 } });
+						setComparisonEditorOpen(true);
+					}}
+				>
+					{t("box")}
+				</Button>
 			</div>
-			{rankingMode === "traits" && state.lowerTabIndex === 0 && (
-				<div style={{ margin: "0 0.5rem 10rem 0.5rem" }}>
-					<IvForm
-						parameter={state.parameter}
-						pokemonIv={state.pokemonIv}
-						dispatch={dispatch}
-						onChange={onPokemonIvChange}
-					/>
-				</div>
-			)}
-			{rankingMode === "traits" && state.lowerTabIndex === 1 && (
-				<BoxTabChild
-					items={state.box.items}
-					iv={state.pokemonIv}
-					selectedId={state.selectedItemId}
-					dispatch={dispatch}
-					parameter={state.parameter}
-				/>
-			)}
-			{rankingMode === "traits" && state.lowerTabIndex === 2 && (
-				<StrengthSettingForm
-					value={state.parameter}
-					items={state.box.items}
-					hasHelpingBonus={state.pokemonIv.hasHelpingBonusInActiveSubSkills}
-					dispatch={dispatch}
-				/>
-			)}
+			<RankingScenarioView
+				state={state}
+				dispatch={dispatch}
+				comparisonIv={comparisonActive ? state.pokemonIv : null}
+				onAddComparison={(iv) => {
+					if (iv) dispatch({ type: "updateIv", payload: { iv } });
+					setComparisonActive(true);
+					if (!iv) setComparisonEditorOpen(true);
+				}}
+				onEditComparison={() => setComparisonEditorOpen(true)}
+				onRemoveComparison={() => setComparisonActive(false)}
+			/>
+			<Dialog
+				open={comparisonEditorOpen}
+				onClose={() => setComparisonEditorOpen(false)}
+				fullWidth
+				maxWidth="sm"
+			>
+				<DialogTitle>
+					{t(comparisonActive ? "fork.scenario.comparison" : "pokemon")}
+				</DialogTitle>
+				<DialogContent>
+					<Tabs
+						value={state.lowerTabIndex === 1 ? 1 : 0}
+						onChange={(_event, index: number) =>
+							dispatch({ type: "changeLowerTab", payload: { index } })
+						}
+					>
+						<Tab label={t("pokemon")} value={0} />
+						<Tab label={t("box")} value={1} />
+					</Tabs>
+					{state.lowerTabIndex !== 1 ? (
+						<>
+							<RateNotFixedPanel state={state} dispatch={dispatch} />
+							<IvForm
+								parameter={createRankingEnvironment(state.parameter)}
+								pokemonIv={state.pokemonIv}
+								dispatch={individualDispatch}
+								onChange={onPokemonIvChange}
+							/>
+						</>
+					) : (
+						<BoxTabChild
+							items={state.box.items}
+							iv={state.pokemonIv}
+							selectedId={state.selectedItemId}
+							dispatch={individualDispatch}
+							parameter={createRankingEnvironment(state.parameter)}
+						/>
+					)}
+				</DialogContent>
+				<DialogActions>
+					<Button onClick={() => setComparisonEditorOpen(false)}>
+						{t("close")}
+					</Button>
+				</DialogActions>
+			</Dialog>
 			<BoxItemDialog
 				key={state.boxItemDialogKey}
 				open={state.boxItemDialogOpen}
 				boxItem={selectedItem}
 				isEdit={state.boxItemDialogIsEdit}
-				parameter={state.parameter}
-				dispatch={dispatch}
+				parameter={createRankingEnvironment(state.parameter)}
+				dispatch={individualDispatch}
 				onClose={onBoxItemEditDialogClose}
 				onChange={onBoxItemDialogChange}
 			/>
