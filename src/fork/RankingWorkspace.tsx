@@ -5,8 +5,6 @@ import {
 	DialogContent,
 	DialogTitle,
 	Snackbar,
-	Tab,
-	Tabs,
 } from "@mui/material";
 import React from "react";
 import { useTranslation } from "react-i18next";
@@ -17,6 +15,7 @@ import BoxItemDialog from "../ui/IvCalc/Box/BoxItemDialog";
 import BoxTabChild from "../ui/IvCalc/Box/BoxTabChild";
 import IvForm from "../ui/IvCalc/IvForm/IvForm";
 import { getInitialIvState } from "../ui/IvCalc/IvState";
+import LowerTabHeader from "../ui/IvCalc/LowerTabHeader";
 import RateNotFixedPanel from "../ui/IvCalc/RateNotFixedPanel";
 import type { PokemonBoxItem } from "../util/PokemonBox";
 import type PokemonIv from "../util/PokemonIv";
@@ -111,15 +110,11 @@ const RankingWorkspace = React.memo(() => {
 					{t(comparisonIv ? "fork.scenario.comparison" : "pokemon")}
 				</DialogTitle>
 				<DialogContent>
-					<Tabs
-						value={state.lowerTabIndex === 1 ? 1 : 0}
-						onChange={(_event, index: number) =>
-							dispatch({ type: "changeLowerTab", payload: { index } })
-						}
-					>
-						<Tab label={t("pokemon")} value={0} />
-						<Tab label={t("box")} value={1} />
-					</Tabs>
+					<LowerTabHeader
+						state={{ ...state, tabIndex: 0 }}
+						isBoxEmpty={state.box.items.length === 0}
+						dispatch={individualDispatch}
+					/>
 					{state.lowerTabIndex !== 1 ? (
 						<>
 							<RateNotFixedPanel state={state} dispatch={dispatch} />
