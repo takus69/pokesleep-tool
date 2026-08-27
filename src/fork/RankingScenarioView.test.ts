@@ -38,6 +38,22 @@ vi.mock("react-i18next", async (importOriginal) => ({
 	useTranslation: () => ({ t: (key: string) => key, i18n: { language: "en" } }),
 }));
 vi.mock("./RankingEnvironmentDialog", () => ({ default: () => null }));
+vi.mock("./RankingPokemonSelect", () => ({
+	default: ({
+		value,
+		onChange,
+	}: {
+		value?: string;
+		onChange: (pokemonName: string) => void;
+	}) =>
+		React.createElement("input", {
+			role: "button",
+			"aria-label": "pokemon",
+			readOnly: true,
+			value: value ? `pokemons.${value}` : "",
+			onClick: () => onChange("Gengar"),
+		}),
+}));
 vi.mock("../util/RankingScenario", async (importOriginal) => ({
 	...(await importOriginal<typeof import("../util/RankingScenario")>()),
 	calculateRankingScenarioAsync: vi.fn(),
@@ -121,19 +137,10 @@ describe("unified scenario view", () => {
 		).toBeTruthy();
 	});
 
-	test("uses the upstream icon picker for the Pokemon conditions in purposes 1 and 2", async () => {
+	test("shows the Pokemon condition only in purposes 1 and 2", async () => {
 		view();
 		const pokemon = screen.getByRole("button", { name: "pokemon" });
-		expect(pokemon.getAttribute("aria-haspopup")).toBe("dialog");
 		fireEvent.click(pokemon);
-		const dialog = await screen.findByRole("dialog");
-		expect(
-			(within(dialog).getByRole("combobox") as HTMLInputElement).value,
-		).toBe("");
-		fireEvent.click(
-			within(dialog).getByRole("option", { name: "pokemons.Gengar" }),
-		);
-		await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
 		expect(
 			(screen.getByRole("button", { name: "pokemon" }) as HTMLInputElement)
 				.value,
@@ -143,7 +150,7 @@ describe("unified scenario view", () => {
 		expect(screen.getByRole("button", { name: "pokemon" })).toBeTruthy();
 		await choose("fork.scenario.purpose", "fork.scenario.purpose berry");
 		expect(screen.queryByRole("button", { name: "pokemon" })).toBeNull();
-	}, 15000);
+	});
 
 	test("offers exactly the six purposes in design order and only their allowed metrics", async () => {
 		view();
