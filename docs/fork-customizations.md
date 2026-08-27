@@ -16,8 +16,13 @@ Fork-specific presentation code lives in `src/fork/`:
   out of the upstream About dialog.
 - `RankingScenarioView.tsx`, `RankingScenarioOptions.tsx`, and
   `RankingScenarioResults.tsx` compose the unified six-purpose ranking flow.
+- `RankingPokemonDetailDialog.tsx` composes upstream RP, strength, and rating
+  views into a read-only ranking-snapshot preview. It is modal on desktop and
+  full-screen on mobile; its isolated reducer must never persist IV, box, or
+  environment changes.
 - `RankingScenarioState.ts` and `useRankingScenario.ts` own purpose-specific
-  settings, explicit calculation, cancellation, and result freshness.
+  settings, explicit calculation, throttled partial results, cancellation,
+  run-id protection, and result freshness.
 - `RankingEnvironmentForm.tsx` and `RankingEnvironmentDialog.tsx` adapt the
   existing strength-parameter controls without individual overrides.
 - `i18n/` contains namespaced `fork.scenario.*`, `fork.ingredientRanking.*`, and `fork.about.*`
@@ -75,13 +80,46 @@ from reused individual/box controls: sanitized parameters passed to their views
 must not accidentally replace the persisted legacy override fields. Review both
 the parameters passed into upstream components and the actions returned by them.
 
+The scenario controls intentionally reuse upstream leaf components instead of
+copying their behavior. Candidate level uses `IvForm/LevelControl.tsx`'s
+`LevelInput`; ingredient selection and result summaries use the existing
+ingredient icon components; nature effects use the upstream UP/DOWN styles and
+translations. Review these imports when their props, limits, rendering, or
+translation contracts change. Keep the small fork composition, but do not copy
+icons, slider logic, or nature-effect styling into fork-owned components.
+
+`RankingPokemonDetailDialog.tsx` is a derived composition of upstream
+`RpView`, `StrengthBerryIngSkillView`, and `RatingView`. It receives a cloned
+candidate and the calculation snapshot environment, and uses only a local
+preview reducer. An upstream ability-tab change requires a semantic review of
+the preview state's required fields, actions, dialog callbacks, and responsive
+layout. Never replace this reducer with the normal IV reducer without proving
+that its persistence side effects remain unreachable.
+
 Purpose-specific settings use the separate localStorage key
 `PstForkRankingScenarios.v1`. It stores the active purpose and one configuration
-per purpose; first-use main conditions are unselected. The island/favorite
+per purpose; first-use main conditions are unselected. The map/favorite
 berries and other environment settings remain exclusively in the existing IV
-state storage. A ranking reset only resets the current purpose. Existing box,
-individual, environment, and legacy ranking storage is not deleted or rewritten
-as a migration. Comparison individuals remain independent of candidate settings.
+state storage. Purpose 6's real-map quick selector writes that same shared
+`fieldIndex` immediately; Expert, variable-berry, and event details stay in the
+shared environment dialog. A ranking reset only resets the current purpose.
+Existing box, individual, environment, and legacy ranking storage is not deleted
+or rewritten as a migration. Comparison individuals remain independent of
+candidate settings.
+
+Candidate calculation still starts only from the explicit calculate action.
+While it runs, the utility publishes throttled partial dense rankings from the
+completed candidates; the UI limits these provisional results to the first 25
+rank groups and replaces them with the complete, untruncated result at finish.
+Progress callbacks remain more frequent than ranking snapshots. AbortSignal,
+run id, and condition-key checks must all remain in place so an old partial or
+final callback cannot overwrite a cancelled, changed, or newer run.
+
+Comparison is entered only from the result header. The dialog reuses the
+upstream manual Pokémon editor and box tabs, but editing or selecting does not
+activate comparison until the user explicitly confirms it. Do not restore a
+candidate-row comparison shortcut or ambiguous permanent Pokémon/box utility
+buttons; ranking candidates instead open the isolated ability-detail dialog.
 
 ## Updating from upstream
 
@@ -125,10 +163,17 @@ as a migration. Comparison individuals remain independent of candidate settings.
    npm run verify
    ```
 
-7. Manually confirm the public ranking route and six-purpose flow, the optional
-   comparison dialog's Pokémon/box tabs, the shared environment dialog, settings
-   language switch, and About/license links. Check that closing/reopening either
-   dialog preserves its data and does not create a second environment editor.
+7. Manually confirm the public ranking route and six-purpose flow. During a
+   non-trivial run, verify that provisional top results appear, are labelled as
+   incomplete, and are replaced by the complete result; also cancel and restart
+   once to check that an old run cannot overwrite the new one. Confirm the
+   result-header comparison dialog's Pokémon/box tabs and explicit confirmation,
+   the purpose-6 real-map quick selector and shared environment details, settings
+   language switch, and About/license links. Open a candidate ability detail on
+   desktop and mobile, check RP/strength/rating against the ranking snapshot,
+   then close it and confirm that IV, box, and environment storage did not change.
+   Check that closing/reopening either dialog preserves intended data and does
+   not create a second environment editor.
 
 ## Expected integration points
 
@@ -145,6 +190,10 @@ The ranking redesign is documented in
 It records confirmed requirements and implementation proposals for a unified
 six-purpose ranking flow; all major user decisions have been resolved. The
 implementation now maps those requirements to the scenario UI, purpose-specific
-state, and shared evaluation pipeline described above. Integration verification
-and browser acceptance checks must still be completed before declaring the
-redesign finished; focused calculation tests alone do not prove UI completion.
+state, and shared evaluation pipeline described above. On 2026-08-27 the final
+integration checks passed: `npm run verify` completed 40 test files and 787
+tests plus the production build, the boundary check kept all 18 upstream-owned
+files clean, and all three boundary regression tests passed. Browser acceptance
+also passed on desktop and a 390×844 mobile viewport, including partial/final
+results, ability details, comparison entry, map synchronization, and a clean
+warning/error console.

@@ -192,6 +192,27 @@ describe("unified scenario view", () => {
 		});
 	});
 
+	test("offers only real maps and writes the quick selection to shared environment", async () => {
+		const { props } = view();
+		await choose("fork.scenario.purpose", "fork.scenario.purpose field");
+		fireEvent.mouseDown(
+			screen.getByRole("combobox", { name: "fork.scenario.map" }),
+		);
+		const listbox = within(screen.getByRole("listbox"));
+		expect(listbox.queryByText("none")).toBeNull();
+		expect(listbox.queryByText("all")).toBeNull();
+		fireEvent.click(listbox.getByRole("option", { name: /area\.1/ }));
+		expect(props.dispatch).toHaveBeenCalledWith({
+			type: "changeParameter",
+			payload: {
+				parameter: expect.objectContaining({ fieldIndex: 1 }),
+			},
+		});
+		expect(
+			screen.getByRole("button", { name: "fork.scenario.map details" }),
+		).toBeTruthy();
+	});
+
 	test("keeps result labels and conditions from the completed snapshot after inputs change", async () => {
 		saveReadyScenario();
 		view();
@@ -232,5 +253,28 @@ describe("unified scenario view", () => {
 		expect(onAddComparison).toHaveBeenCalledTimes(1);
 		expect(onAddComparison).toHaveBeenCalledWith();
 		expect(calculateRankingScenarioAsync).toHaveBeenCalledTimes(1);
+	});
+
+	test("labels partial rankings while calculation is still running", async () => {
+		saveReadyScenario();
+		vi.mocked(calculateRankingScenarioAsync).mockImplementation(
+			async (_config, _environment, options) => {
+				options?.onPartialResult?.({
+					completed: 20,
+					result: { entries: [], groups: [], exclusions: [] },
+				});
+				return await new Promise(() => {});
+			},
+		);
+		view();
+		await act(async () => {
+			fireEvent.click(
+				screen.getByRole("button", { name: "fork.scenario.calculate" }),
+			);
+		});
+		expect(
+			await screen.findByText("fork.scenario.partial result"),
+		).toBeTruthy();
+		expect(screen.getByText("fork.scenario.calculating")).toBeTruthy();
 	});
 });

@@ -2,6 +2,7 @@ import {
 	Alert,
 	Box,
 	Button,
+	ButtonBase,
 	Dialog,
 	DialogActions,
 	DialogContent,
@@ -12,17 +13,38 @@ import {
 } from "@mui/material";
 import React from "react";
 import { useTranslation } from "react-i18next";
+import IngredientCountIcon from "../ui/IvCalc/IngredientCountIcon";
+import {
+	StyledNatureDownEffect,
+	StyledNatureUpEffect,
+} from "../ui/IvCalc/IvForm/NatureTextField";
 import PokemonIcon from "../ui/IvCalc/PokemonIcon";
 import type PokemonIv from "../util/PokemonIv";
+import type { StrengthParameter } from "../util/PokemonStrength";
 import type {
 	RankingScenarioEntry,
 	RankingScenarioEvaluation,
 	RankingScenarioGroup,
 	RankingScenarioResult,
 } from "../util/RankingScenario";
+import RankingPokemonDetailDialog from "./RankingPokemonDetailDialog";
 import { ribbonLabels } from "./RankingScenarioOptions";
 
 export const rankingPageSize = 100;
+export const partialRankingGroupLimit = 25;
+
+interface RankingScenarioResultsProps {
+	result: RankingScenarioResult;
+	comparison: RankingScenarioEvaluation | null;
+	comparisonIv: PokemonIv | null;
+	stale: boolean;
+	metricLabel: string;
+	environment: StrengthParameter;
+	isPartial?: boolean;
+	onAddComparison: () => void;
+	onEditComparison: () => void;
+	onRemoveComparison: () => void;
+}
 
 /** Same dense insertion semantics as the existing ingredient comparison flow. */
 export function locateScenarioComparison(
@@ -40,64 +62,100 @@ export function locateScenarioComparison(
 	};
 }
 
-export function ScenarioIvSummary({ iv }: { iv: PokemonIv }) {
+export function ScenarioIvSummary({
+	iv,
+	neutralSubSkillCount = 0,
+	onClick,
+}: {
+	iv: PokemonIv;
+	neutralSubSkillCount?: number;
+	onClick?: () => void;
+}) {
 	const { t } = useTranslation();
-	const slots = [iv.ingredient1, iv.ingredient2, iv.ingredient3];
-	return (
+	const slots = [
+		[1, iv.ingredient1],
+		[30, iv.ingredient2],
+		[60, iv.ingredient3],
+	] as const;
+	const subSkills = iv.activeSubSkills.map((skill) =>
+		t(`subskill.${skill.name}`),
+	);
+	if (neutralSubSkillCount > 0)
+		subSkills.push(
+			t("fork.ingredientRanking.neutral subskill") +
+				` ×${neutralSubSkillCount}`,
+		);
+	const summary = (
 		<Stack direction="row" gap={1} alignItems="center" sx={{ minWidth: 0 }}>
 			<PokemonIcon idForm={iv.idForm} shiny={iv.shiny} size={36} />
 			<div>
-				<Typography variant="body2">
-					{t(`pokemons.${iv.pokemonName}`)} · Lv {iv.level} ·{" "}
-					{iv.isMythical ? "" : iv.ingredient}
+				<Typography variant="body2" fontWeight="bold">
+					{t(`pokemons.${iv.pokemonName}`)} · Lv {iv.level}
 				</Typography>
-				<Typography variant="caption" component="div">
-					{slots
-						.map(
-							(slot, index) =>
-								`${[1, 30, 60][index]}: ${t(`ingredients.${slot.name}`)}`,
-						)
-						.join(" / ")}
+				<Stack direction="row" alignItems="center" sx={{ minHeight: 28 }}>
+					{slots.map(([level, slot]) => (
+						<IngredientCountIcon
+							key={level}
+							name={slot.name}
+							count={slot.count}
+						/>
+					))}
+				</Stack>
+				<Typography variant="caption" component="div" color="text.secondary">
+					<strong>{t("sub skills")}:</strong> {subSkills.join(" / ") || "-"}
 				</Typography>
-				<Typography variant="caption" component="div">
-					{t(`natures.${iv.nature.name}`)} · {t("skill level")} {iv.skillLevel}{" "}
-					· {t(ribbonLabels[iv.ribbon])}
-				</Typography>
-				<Typography variant="caption" component="div">
-					{iv.activeSubSkills
-						.map((skill) => t(`subskill.${skill.name}`))
-						.join(" / ") || t("none")}
+				<Typography variant="caption" component="div" color="text.secondary">
+					<strong>{t("nature")}:</strong>{" "}
+					{iv.nature.upEffect === "No effect" ? (
+						t("nature effect.No effect")
+					) : (
+						<>
+							<StyledNatureUpEffect>UP</StyledNatureUpEffect>{" "}
+							{t(`nature effect.${iv.nature.upEffect}`)}{" "}
+							<StyledNatureDownEffect>DOWN</StyledNatureDownEffect>{" "}
+							{t(`nature effect.${iv.nature.downEffect}`)}
+						</>
+					)}
+					{` · ${t("skill level")} ${iv.skillLevel} · ${t(ribbonLabels[iv.ribbon])}`}
 				</Typography>
 			</div>
 		</Stack>
 	);
+	if (!onClick) return summary;
+	return (
+		<ButtonBase
+			onClick={onClick}
+			aria-label={`${t(`pokemons.${iv.pokemonName}`)} ${t("details")}`}
+			sx={{ width: "100%", justifyContent: "flex-start", textAlign: "left" }}
+		>
+			{summary}
+		</ButtonBase>
+	);
 }
 
-export default function RankingScenarioResults({
+function RankingScenarioResults({
 	result,
 	comparison,
 	comparisonIv,
 	stale,
 	metricLabel,
+	environment,
+	isPartial = false,
 	onAddComparison,
 	onEditComparison,
 	onRemoveComparison,
-}: {
-	result: RankingScenarioResult;
-	comparison: RankingScenarioEvaluation | null;
-	comparisonIv: PokemonIv | null;
-	stale: boolean;
-	metricLabel: string;
-	onAddComparison: (iv?: PokemonIv) => void;
-	onEditComparison: () => void;
-	onRemoveComparison: () => void;
-}) {
+}: RankingScenarioResultsProps) {
 	const { t, i18n } = useTranslation();
 	const [page, setPage] = React.useState(1);
 	const [detailEntries, setDetailEntries] = React.useState<
 		readonly RankingScenarioEntry[] | null
 	>(null);
 	const [detailPage, setDetailPage] = React.useState(1);
+	const [abilityIv, setAbilityIv] = React.useState<PokemonIv | null>(null);
+	const openAbility = (iv: PokemonIv) => {
+		setDetailEntries(null);
+		setAbilityIv(iv);
+	};
 	const merged = React.useMemo(
 		() => locateScenarioComparison(result.groups, comparison),
 		[result.groups, comparison],
@@ -106,14 +164,19 @@ export default function RankingScenarioResults({
 		() => new Intl.NumberFormat(i18n.language, { maximumFractionDigits: 2 }),
 		[i18n.language],
 	);
-	const pageCount = Math.max(
-		1,
-		Math.ceil(result.groups.length / rankingPageSize),
-		merged.page ?? 1,
-	);
+	const pageCount = isPartial
+		? 1
+		: Math.max(
+				1,
+				Math.ceil(result.groups.length / rankingPageSize),
+				merged.page ?? 1,
+			);
 	const currentPage = Math.min(page, pageCount);
-	const start = (currentPage - 1) * rankingPageSize;
-	const end = Math.min(start + rankingPageSize, result.groups.length);
+	const start = isPartial ? 0 : (currentPage - 1) * rankingPageSize;
+	const end = Math.min(
+		start + (isPartial ? partialRankingGroupLimit : rankingPageSize),
+		result.groups.length,
+	);
 	const previousResult = React.useRef(result);
 	React.useEffect(() => {
 		if (previousResult.current !== result) {
@@ -258,7 +321,13 @@ export default function RankingScenarioResults({
 								{formatter.format(group.value)}
 							</Typography>
 						</Stack>
-						{group.entries[0] && <ScenarioIvSummary iv={group.entries[0].iv} />}
+						{group.entries[0] && (
+							<ScenarioIvSummary
+								iv={group.entries[0].iv}
+								neutralSubSkillCount={group.entries[0].neutralSubSkillCount}
+								onClick={() => openAbility(group.entries[0].iv)}
+							/>
+						)}
 						{group.entries.length > 0 && (
 							<Stack direction="row" flexWrap="wrap">
 								<Button
@@ -271,12 +340,6 @@ export default function RankingScenarioResults({
 									{t("fork.scenario.show conditions", {
 										count: group.entries.length,
 									})}
-								</Button>
-								<Button
-									size="small"
-									onClick={() => onAddComparison(group.entries[0].iv)}
-								>
-									{t("fork.scenario.compare this")}
 								</Button>
 							</Stack>
 						)}
@@ -306,23 +369,11 @@ export default function RankingScenarioResults({
 						?.slice((detailPage - 1) * 50, detailPage * 50)
 						.map((entry) => (
 							<Box key={entry.id} sx={{ mb: 2 }}>
-								<ScenarioIvSummary iv={entry.iv} />
-								{(entry.neutralSubSkillCount ?? 0) > 0 && (
-									<Typography variant="caption">
-										{t("fork.scenario.neutral slots", {
-											count: entry.neutralSubSkillCount,
-										})}
-									</Typography>
-								)}
-								<Button
-									size="small"
-									onClick={() => {
-										onAddComparison(entry.iv);
-										setDetailEntries(null);
-									}}
-								>
-									{t("fork.scenario.compare this")}
-								</Button>
+								<ScenarioIvSummary
+									iv={entry.iv}
+									neutralSubSkillCount={entry.neutralSubSkillCount}
+									onClick={() => openAbility(entry.iv)}
+								/>
 							</Box>
 						))}
 					{detailEntries && detailEntries.length > 50 && (
@@ -338,6 +389,20 @@ export default function RankingScenarioResults({
 					<Button onClick={() => setDetailEntries(null)}>{t("close")}</Button>
 				</DialogActions>
 			</Dialog>
+			{abilityIv && (
+				<RankingPokemonDetailDialog
+					open
+					iv={abilityIv}
+					environment={environment}
+					summary={<ScenarioIvSummary iv={abilityIv} />}
+					onClose={() => setAbilityIv(null)}
+				/>
+			)}
 		</Stack>
 	);
 }
+
+// Progress is updated every small candidate batch so abort stays responsive.
+// The ranking itself only changes on a throttled partial/final result; memoizing
+// here prevents those progress-only parent renders from rebuilding 25–100 rows.
+export default React.memo(RankingScenarioResults);

@@ -101,12 +101,17 @@ export interface RankingScenarioResult {
 	groups: RankingScenarioGroup[];
 	exclusions: RankingScenarioExclusion[];
 }
+export interface RankingScenarioPartialResult {
+	result: RankingScenarioResult;
+	completed: number;
+}
 export type RankingScenarioEvaluation =
 	| { status: "positive" | "zero"; value: number }
 	| { status: "uncalculable"; reason: RankingScenarioReason };
 export interface RankingScenarioCalculationOptions {
 	signal?: AbortSignal;
 	onProgress?: (completed: number) => void;
+	onPartialResult?: (partial: RankingScenarioPartialResult) => void;
 	strengthCalculator?: IngredientRankingStrengthCalculator;
 }
 
@@ -392,6 +397,14 @@ function finish(
 	};
 }
 
+const progressInterval = 32;
+const firstPartialResult = 128;
+// Sorting and rendering a partial ranking is substantially more expensive than
+// publishing the numeric progress counter. Keep cancellation/progress yields
+// frequent, but cap partial rankings at two per second.
+const partialResultInterval = 256;
+const partialResultTimeInterval = 500;
+
 /** Yield between bounded candidate batches so cancellation remains responsive. */
 export async function calculateRankingScenarioAsync(
 	config: RankingScenarioConfig,
@@ -405,6 +418,34 @@ export async function calculateRankingScenarioAsync(
 	const exclusions = new Map<RankingScenarioReason, number>();
 	const cache = new Map<string, RankingScenarioEvaluation>();
 	let ordinal = 0;
+	let lastPartialCompleted = 0;
+	let lastPartialTime = Date.now();
+	const notifyProgress = async () => {
+		options.onProgress?.(ordinal);
+		const now = Date.now();
+		const hasInitialBatch = ordinal >= firstPartialResult;
+		const candidateIntervalReached =
+			lastPartialCompleted === 0 ||
+			ordinal >= lastPartialCompleted + partialResultInterval;
+		const timeIntervalReached =
+			lastPartialCompleted === 0 ||
+			now - lastPartialTime >= partialResultTimeInterval;
+		if (
+			options.onPartialResult !== undefined &&
+			hasInitialBatch &&
+			candidateIntervalReached &&
+			timeIntervalReached
+		) {
+			options.onPartialResult({
+				result: finish(entries, exclusions),
+				completed: ordinal,
+			});
+			lastPartialCompleted = ordinal;
+			// Do not count sorting and rendering callback time toward the next interval.
+			lastPartialTime = Date.now();
+		}
+		await new Promise((resolve) => setTimeout(resolve, 0));
+	};
 	for (const candidate of generateCandidates(config, environment)) {
 		options.signal?.throwIfAborted();
 		const iv = candidate.iv;
@@ -412,10 +453,7 @@ export async function calculateRankingScenarioAsync(
 			const reason = candidate.reason ?? "calculationFailed";
 			exclusions.set(reason, (exclusions.get(reason) ?? 0) + 1);
 			ordinal += 1;
-			if (ordinal % 32 === 0) {
-				options.onProgress?.(ordinal);
-				await new Promise((resolve) => setTimeout(resolve, 0));
-			}
+			if (ordinal % progressInterval === 0) await notifyProgress();
 			continue;
 		}
 		// Only trait enumeration has equal effect signatures; species and pattern are fixed.
@@ -466,10 +504,7 @@ export async function calculateRankingScenarioAsync(
 			}
 		}
 		ordinal += 1;
-		if (ordinal % 32 === 0) {
-			options.onProgress?.(ordinal);
-			await new Promise((resolve) => setTimeout(resolve, 0));
-		}
+		if (ordinal % progressInterval === 0) await notifyProgress();
 	}
 	options.signal?.throwIfAborted();
 	options.onProgress?.(ordinal);

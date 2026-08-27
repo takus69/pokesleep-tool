@@ -13,6 +13,7 @@ import {
 import { useTranslation } from "react-i18next";
 import pokemons from "../data/pokemons";
 import IngredientTextField from "../ui/IvCalc/IvForm/IngredientTextField";
+import { LevelInput } from "../ui/IvCalc/IvForm/LevelControl";
 import NatureTextField from "../ui/IvCalc/IvForm/NatureTextField";
 import SleepingTimeControl from "../ui/IvCalc/IvForm/SleepingTimeControl";
 import SubSkillControl from "../ui/IvCalc/IvForm/SubSkillControl";
@@ -97,19 +98,16 @@ export default function RankingScenarioOptions({
 			</AccordionSummary>
 			<AccordionDetails>
 				<Stack gap={2}>
-					<Stack direction="row" gap={2}>
-						<TextField
-							label={t("level")}
-							type="number"
-							size="small"
-							value={config.level}
-							slotProps={{ htmlInput: { min: 1, max: 100 } }}
-							onChange={(event) => {
-								const level = Number(event.target.value);
-								if (Number.isInteger(level) && level >= 1 && level <= 100)
-									update({ level });
-							}}
-						/>
+					<Stack direction="row" gap={2} alignItems="center">
+						<Stack direction="row" gap={1} alignItems="center">
+							<Typography variant="body2">{t("level")}</Typography>
+							<LevelInput
+								max100
+								showSlider
+								value={config.level}
+								onChange={(level) => update({ level })}
+							/>
+						</Stack>
 						<TextField
 							select
 							fullWidth
@@ -227,6 +225,9 @@ export default function RankingScenarioOptions({
 									</MenuItem>
 								))}
 							</TextField>
+							<Typography variant="caption" color="text.secondary">
+								{t("fork.scenario.mythical note")}
+							</Typography>
 							<FormControlLabel
 								label={t("fork.scenario.include unevolved")}
 								control={

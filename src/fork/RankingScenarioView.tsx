@@ -11,12 +11,14 @@ import {
 } from "@mui/material";
 import React from "react";
 import { useTranslation } from "react-i18next";
+import fields from "../data/fields";
 import pokemons, {
 	type IngredientName,
 	IngredientNames,
 	type PokemonType,
 	PokemonTypes,
 } from "../data/pokemons";
+import IngredientIcon from "../ui/IvCalc/IngredientIcon";
 import type IvState from "../ui/IvCalc/IvState";
 import type { IvAction } from "../ui/IvCalc/IvState";
 import { type MainSkillName, MainSkillNames } from "../util/MainSkill";
@@ -118,7 +120,7 @@ export default function RankingScenarioView({
 	state: IvState;
 	dispatch: React.Dispatch<IvAction>;
 	comparisonIv: PokemonIv | null;
-	onAddComparison: (iv?: PokemonIv) => void;
+	onAddComparison: () => void;
 	onEditComparison: () => void;
 	onRemoveComparison: () => void;
 }) {
@@ -132,6 +134,11 @@ export default function RankingScenarioView({
 	const validation = validateRankingScenario(config, state.parameter);
 	const metricLabel = (value: RankingScenarioConfig) =>
 		`${t(`fork.ingredientRanking.${metricKeys[value.target]}`)}${value.target === "specificIngredientCount" && value.ingredient ? ` (${t(`ingredients.${value.ingredient}`)})` : ""}`;
+	const changeField = (fieldIndex: number) =>
+		dispatch({
+			type: "changeParameter",
+			payload: { parameter: { ...state.parameter, fieldIndex } },
+		});
 	return (
 		<Stack gap={2} sx={{ p: 1 }}>
 			<TextField
@@ -213,17 +220,33 @@ export default function RankingScenarioView({
 				</TextField>
 			)}
 			{config.purpose === "field" && (
-				<Box>
-					<Typography>
-						{t("research area")}:{" "}
-						{state.parameter.fieldIndex < 0
-							? t(key("select condition"))
-							: t(`area.${state.parameter.fieldIndex}`)}
-					</Typography>
-					<Button onClick={() => setEnvironmentOpen(true)}>
-						{t(key("select field"))}
+				<Stack direction="row" gap={1} alignItems="center">
+					<TextField
+						select
+						fullWidth
+						size="small"
+						label={t(key("map"))}
+						value={
+							state.parameter.fieldIndex >= 0 ? state.parameter.fieldIndex : ""
+						}
+						onChange={(event) => changeField(Number(event.target.value))}
+					>
+						<MenuItem value="" disabled>
+							{t(key("select condition"))}
+						</MenuItem>
+						{fields.map((field) => (
+							<MenuItem key={field.index} value={field.index}>
+								{field.emoji} {t(`area.${field.index}`)}
+							</MenuItem>
+						))}
+					</TextField>
+					<Button
+						onClick={() => setEnvironmentOpen(true)}
+						sx={{ whiteSpace: "nowrap" }}
+					>
+						{t(key("map details"))}
 					</Button>
-				</Box>
+				</Stack>
 			)}
 			<TextField
 				select
@@ -257,7 +280,10 @@ export default function RankingScenarioView({
 					{IngredientNames.filter((name) => !name.startsWith("unknown")).map(
 						(name) => (
 							<MenuItem key={name} value={name}>
-								{t(`ingredients.${name}`)}
+								<Stack direction="row" gap={1} alignItems="center">
+									<IngredientIcon name={name} />
+									<span>{t(`ingredients.${name}`)}</span>
+								</Stack>
 							</MenuItem>
 						),
 					)}
@@ -326,6 +352,9 @@ export default function RankingScenarioView({
 			)}
 			{ranking.result && ranking.snapshot && (
 				<>
+					{ranking.status === "running" && (
+						<Alert severity="info">{t(key("partial result"))}</Alert>
+					)}
 					{ranking.stale && <Alert severity="warning">{t(key("stale"))}</Alert>}
 					<Box>
 						<Typography variant="subtitle2">
@@ -353,6 +382,8 @@ export default function RankingScenarioView({
 						comparisonIv={comparisonIv}
 						stale={ranking.stale}
 						metricLabel={metricLabel(ranking.snapshot.config)}
+						environment={ranking.snapshot.environment}
+						isPartial={ranking.status === "running"}
 						onAddComparison={onAddComparison}
 						onEditComparison={onEditComparison}
 						onRemoveComparison={onRemoveComparison}

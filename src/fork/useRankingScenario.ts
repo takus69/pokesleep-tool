@@ -133,6 +133,8 @@ export default function useRankingScenario(
 		setStatus("running");
 		setError(null);
 		setProgress(0);
+		setResult(null);
+		setSnapshot(calculationSnapshot);
 		const isCurrent = () =>
 			id === runId.current &&
 			!controller.signal.aborted &&
@@ -145,6 +147,11 @@ export default function useRankingScenario(
 					signal: controller.signal,
 					onProgress: (completed) => {
 						if (isCurrent()) setProgress(completed);
+					},
+					onPartialResult: (partial) => {
+						if (!isCurrent()) return;
+						setProgress(partial.completed);
+						setResult(partial.result);
 					},
 				},
 			);

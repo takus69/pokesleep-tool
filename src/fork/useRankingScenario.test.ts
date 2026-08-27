@@ -47,6 +47,42 @@ beforeEach(() => {
 });
 
 describe("explicit ranking calculation lifecycle", () => {
+	test("publishes a snapshot and partial result while a run is active", async () => {
+		const pending = deferred();
+		vi.mocked(calculateRankingScenarioAsync).mockReturnValue(pending.promise);
+		const { result } = renderHook(() =>
+			useRankingScenario(createStrengthParameter({}), null),
+		);
+		let run!: Promise<void>;
+		act(() => {
+			run = result.current.calculate();
+		});
+		expect(result.current.status).toBe("running");
+		expect(result.current.snapshot).not.toBeNull();
+		expect(result.current.result).toBeNull();
+
+		const partial = emptyResult();
+		act(() => {
+			vi.mocked(
+				calculateRankingScenarioAsync,
+			).mock.calls[0][2]?.onPartialResult?.({
+				result: partial,
+				completed: 128,
+			});
+		});
+		expect(result.current.status).toBe("running");
+		expect(result.current.progress).toBe(128);
+		expect(result.current.result).toBe(partial);
+
+		const complete = emptyResult();
+		await act(async () => {
+			pending.resolve(complete);
+			await run;
+		});
+		expect(result.current.status).toBe("complete");
+		expect(result.current.result).toBe(complete);
+	});
+
 	test("does not run on load or edits, keeps stale snapshot until explicit recalculation", async () => {
 		const environment = createStrengthParameter({});
 		const { result } = renderHook(() => useRankingScenario(environment, null));
@@ -119,6 +155,13 @@ describe("explicit ranking calculation lifecycle", () => {
 		});
 		await act(async () => {
 			oldOptions?.onProgress?.(999);
+			oldOptions?.onPartialResult?.({
+				result: {
+					...emptyResult(),
+					exclusions: [{ reason: "invalidValue", count: 1 }],
+				},
+				completed: 999,
+			});
 			oldRun.resolve(emptyResult());
 			await oldPromise;
 		});

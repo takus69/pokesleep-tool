@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 import pokemons from "../data/pokemons";
 import { getMaxSkillLevel, matchMainSkillName } from "./MainSkill";
 import Nature from "./Nature";
@@ -12,6 +12,7 @@ import {
 	createRankingEnvironment,
 	evaluateRankingComparison,
 	type RankingScenarioConfig,
+	type RankingScenarioPartialResult,
 	validateRankingScenario,
 } from "./RankingScenario";
 import SubSkill from "./SubSkill";
@@ -543,6 +544,53 @@ describe("shared evaluation and individual independence", () => {
 });
 
 describe("execution contract", () => {
+	test("publishes throttled dense partial rankings without dropping tied conditions", async () => {
+		let now = 0;
+		const clock = vi.spyOn(Date, "now").mockImplementation(() => now);
+		const partials: Array<
+			RankingScenarioPartialResult & { publishedAt: number }
+		> = [];
+		const result = await calculateRankingScenarioAsync(
+			config({ purpose: "traits", target: "totalStrength", level: 60 }),
+			environment,
+			{
+				strengthCalculator: (iv) => ({
+					...constant(),
+					totalStrength: iv.activeSubSkills.length,
+				}),
+				onProgress: () => {
+					// Model 2 ms of candidate work between progress callbacks.
+					now += 64;
+				},
+				onPartialResult: (partial) =>
+					partials.push({ ...partial, publishedAt: now }),
+			},
+		);
+
+		expect(partials.length).toBeGreaterThan(2);
+		expect(partials[0].completed).toBe(128);
+		expect(partials[0].result.entries).toHaveLength(128);
+		expect(partials[0].result.groups.map((group) => group.value)).toEqual([
+			3, 2, 1, 0,
+		]);
+		expect(
+			partials[0].result.groups.every((group) =>
+				group.entries.every((entry) => entry.value === group.value),
+			),
+		).toBe(true);
+		for (let index = 1; index < partials.length; index += 1) {
+			expect(
+				partials[index].publishedAt - partials[index - 1].publishedAt,
+			).toBeGreaterThanOrEqual(500);
+			expect(
+				partials[index].completed - partials[index - 1].completed,
+			).toBeGreaterThanOrEqual(256);
+		}
+		expect(result.entries).toHaveLength(25 * 299);
+		expect(partials.at(-1)?.completed).toBeLessThan(result.entries.length);
+		clock.mockRestore();
+	});
+
 	test("validates main conditions, metric and real island without calculating", () => {
 		expect(
 			validateRankingScenario(config({ pokemonName: undefined }), environment),

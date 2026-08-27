@@ -32,7 +32,9 @@ const RankingWorkspace = React.memo(() => {
 		rankingWorkspaceReducer,
 		initialIvState,
 	);
-	const [comparisonActive, setComparisonActive] = React.useState(false);
+	const [comparisonIv, setComparisonIv] = React.useState<PokemonIv | null>(
+		null,
+	);
 	const [comparisonEditorOpen, setComparisonEditorOpen] = React.useState(false);
 	const { t } = useTranslation();
 	const selectedItem = state.box.getById(state.selectedItemId);
@@ -84,37 +86,20 @@ const RankingWorkspace = React.memo(() => {
 
 	return (
 		<>
-			<div style={{ display: "flex", justifyContent: "flex-end" }}>
-				<Button
-					size="small"
-					onClick={() => {
-						dispatch({ type: "changeLowerTab", payload: { index: 0 } });
-						setComparisonEditorOpen(true);
-					}}
-				>
-					{t("pokemon")}
-				</Button>
-				<Button
-					size="small"
-					onClick={() => {
-						dispatch({ type: "changeLowerTab", payload: { index: 1 } });
-						setComparisonEditorOpen(true);
-					}}
-				>
-					{t("box")}
-				</Button>
-			</div>
 			<RankingScenarioView
 				state={state}
 				dispatch={dispatch}
-				comparisonIv={comparisonActive ? state.pokemonIv : null}
-				onAddComparison={(iv) => {
-					if (iv) dispatch({ type: "updateIv", payload: { iv } });
-					setComparisonActive(true);
-					if (!iv) setComparisonEditorOpen(true);
+				comparisonIv={comparisonIv}
+				onAddComparison={() => {
+					dispatch({ type: "changeLowerTab", payload: { index: 0 } });
+					setComparisonEditorOpen(true);
 				}}
-				onEditComparison={() => setComparisonEditorOpen(true)}
-				onRemoveComparison={() => setComparisonActive(false)}
+				onEditComparison={() => {
+					if (comparisonIv)
+						dispatch({ type: "updateIv", payload: { iv: comparisonIv } });
+					setComparisonEditorOpen(true);
+				}}
+				onRemoveComparison={() => setComparisonIv(null)}
 			/>
 			<Dialog
 				open={comparisonEditorOpen}
@@ -123,7 +108,7 @@ const RankingWorkspace = React.memo(() => {
 				maxWidth="sm"
 			>
 				<DialogTitle>
-					{t(comparisonActive ? "fork.scenario.comparison" : "pokemon")}
+					{t(comparisonIv ? "fork.scenario.comparison" : "pokemon")}
 				</DialogTitle>
 				<DialogContent>
 					<Tabs
@@ -156,6 +141,15 @@ const RankingWorkspace = React.memo(() => {
 					)}
 				</DialogContent>
 				<DialogActions>
+					<Button
+						variant="contained"
+						onClick={() => {
+							setComparisonIv(state.pokemonIv);
+							setComparisonEditorOpen(false);
+						}}
+					>
+						{t("fork.scenario.set comparison")}
+					</Button>
 					<Button onClick={() => setComparisonEditorOpen(false)}>
 						{t("close")}
 					</Button>
