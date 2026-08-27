@@ -1,6 +1,5 @@
 import {
 	Alert,
-	Autocomplete,
 	Box,
 	Button,
 	CircularProgress,
@@ -12,7 +11,7 @@ import {
 import React from "react";
 import { useTranslation } from "react-i18next";
 import fields from "../data/fields";
-import pokemons, {
+import {
 	type IngredientName,
 	IngredientNames,
 	type PokemonType,
@@ -35,6 +34,7 @@ import {
 	validateRankingScenario,
 } from "../util/RankingScenario";
 import RankingEnvironmentDialog from "./RankingEnvironmentDialog";
+import RankingPokemonSelect from "./RankingPokemonSelect";
 import RankingScenarioOptions, {
 	RankingOptionSummary,
 } from "./RankingScenarioOptions";
@@ -159,25 +159,16 @@ export default function RankingScenarioView({
 				))}
 			</TextField>
 			{["traits", "ingredients"].includes(config.purpose) && (
-				<Autocomplete
-					options={pokemons}
-					value={
-						pokemons.find((pokemon) => pokemon.name === config.pokemonName) ??
-						null
-					}
-					getOptionLabel={(pokemon) => t(`pokemons.${pokemon.name}`)}
-					isOptionEqualToValue={(a, b) => a.name === b.name}
-					onChange={(_event, pokemon) =>
+				<RankingPokemonSelect
+					value={config.pokemonName}
+					onChange={(pokemonName) =>
 						update({
-							pokemonName: pokemon?.name,
+							pokemonName,
 							mythIng1: undefined,
 							mythIng2: undefined,
 							mythIng3: undefined,
 						})
 					}
-					renderInput={(params) => (
-						<TextField {...params} label={t("pokemon")} size="small" />
-					)}
 				/>
 			)}
 			{config.purpose === "berry" && (

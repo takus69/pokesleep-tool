@@ -19,6 +19,11 @@ import {
 import RankingScenarioView from "./RankingScenarioView";
 
 vi.hoisted(() => {
+	class ResizeObserverMock {
+		observe() {}
+		disconnect() {}
+	}
+	vi.stubGlobal("ResizeObserver", ResizeObserverMock);
 	Object.defineProperty(window, "matchMedia", {
 		configurable: true,
 		value: () => ({
@@ -92,7 +97,7 @@ describe("unified scenario view", () => {
 		expect(screen.getByText("fork.brand.subtitle")).toBeTruthy();
 		expect(calculateRankingScenarioAsync).not.toHaveBeenCalled();
 		expect(
-			(screen.getByRole("combobox", { name: "pokemon" }) as HTMLInputElement)
+			(screen.getByRole("button", { name: "pokemon" }) as HTMLInputElement)
 				.value,
 		).toBe("");
 		expect(
@@ -115,6 +120,30 @@ describe("unified scenario view", () => {
 			screen.getByText("fork.scenario.metric note specific ingredient count"),
 		).toBeTruthy();
 	});
+
+	test("uses the upstream icon picker for the Pokemon conditions in purposes 1 and 2", async () => {
+		view();
+		const pokemon = screen.getByRole("button", { name: "pokemon" });
+		expect(pokemon.getAttribute("aria-haspopup")).toBe("dialog");
+		fireEvent.click(pokemon);
+		const dialog = await screen.findByRole("dialog");
+		expect(
+			(within(dialog).getByRole("combobox") as HTMLInputElement).value,
+		).toBe("");
+		fireEvent.click(
+			within(dialog).getByRole("option", { name: "pokemons.Gengar" }),
+		);
+		await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+		expect(
+			(screen.getByRole("button", { name: "pokemon" }) as HTMLInputElement)
+				.value,
+		).toBe("pokemons.Gengar");
+
+		await choose("fork.scenario.purpose", "fork.scenario.purpose ingredients");
+		expect(screen.getByRole("button", { name: "pokemon" })).toBeTruthy();
+		await choose("fork.scenario.purpose", "fork.scenario.purpose berry");
+		expect(screen.queryByRole("button", { name: "pokemon" })).toBeNull();
+	}, 15000);
 
 	test("offers exactly the six purposes in design order and only their allowed metrics", async () => {
 		view();

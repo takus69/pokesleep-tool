@@ -84,12 +84,16 @@ must not accidentally replace the persisted legacy override fields. Review both
 the parameters passed into upstream components and the actions returned by them.
 
 The scenario controls intentionally reuse upstream leaf components instead of
-copying their behavior. Candidate level uses `IvForm/LevelControl.tsx`'s
-`LevelInput`; ingredient selection and result summaries use the existing
-ingredient icon components; nature effects use the upstream UP/DOWN styles and
-translations. Review these imports when their props, limits, rendering, or
-translation contracts change. Keep the small fork composition, but do not copy
-icons, slider logic, or nature-effect styling into fork-owned components.
+copying their behavior. `RankingPokemonSelect.tsx` adds the ranking-specific
+unselected field state around the upstream `PokemonSelectDialog`, retaining its
+icon grid, search, filters, sorting, and `PstPokemonSelectParam` preferences for
+the species conditions in purposes 1 and 2. Candidate level uses
+`IvForm/LevelControl.tsx`'s `LevelInput`; ingredient selection and result
+summaries use the existing ingredient icon components; nature effects use the
+upstream UP/DOWN styles and translations. Review these imports when their props,
+limits, rendering, or translation contracts change. Keep the small fork
+composition, but do not copy icons, slider logic, or nature-effect styling into
+fork-owned components.
 
 `RankingPokemonDetailDialog.tsx` is a derived composition of upstream
 `RpView`, `StrengthBerryIngSkillView`, and `RatingView`. It receives a cloned
