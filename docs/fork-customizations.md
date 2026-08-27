@@ -123,6 +123,10 @@ upstream manual Pokémon editor and box tabs, but editing or selecting does not
 activate comparison until the user explicitly confirms it. Do not restore a
 candidate-row comparison shortcut or ambiguous permanent Pokémon/box utility
 buttons; ranking candidates instead open the isolated ability-detail dialog.
+`RankingComparisonBoxPanel.tsx` adapts the upstream full-page `BoxView` footer
+to the dialog: the item list is the only scrolling region, while export notice,
+sort/filter controls, and comparison actions stay within the dialog width and
+height. Review its two-direct-child layout contract whenever `BoxView` changes.
 The comparison dialog also reuses the upstream `LowerTabHeader`: its Pokémon
 menu adds the currently edited individual to the existing box, and its box menu
 opens the existing import, export, and delete-all dialogs. Keep those upstream

@@ -12,7 +12,6 @@ import BoxDeleteAllDialog from "../ui/IvCalc/Box/BoxDeleteAllDialog";
 import BoxExportDialog from "../ui/IvCalc/Box/BoxExportDialog";
 import BoxImportDialog from "../ui/IvCalc/Box/BoxImportDialog";
 import BoxItemDialog from "../ui/IvCalc/Box/BoxItemDialog";
-import BoxTabChild from "../ui/IvCalc/Box/BoxTabChild";
 import IvForm from "../ui/IvCalc/IvForm/IvForm";
 import { getInitialIvState } from "../ui/IvCalc/IvState";
 import LowerTabHeader from "../ui/IvCalc/LowerTabHeader";
@@ -20,6 +19,7 @@ import RateNotFixedPanel from "../ui/IvCalc/RateNotFixedPanel";
 import type { PokemonBoxItem } from "../util/PokemonBox";
 import type PokemonIv from "../util/PokemonIv";
 import { createRankingEnvironment } from "../util/RankingScenario";
+import RankingComparisonBoxPanel from "./RankingComparisonBoxPanel";
 import { preserveRankingIndividualSettings } from "./RankingEnvironmentForm";
 import RankingScenarioView from "./RankingScenarioView";
 import { rankingWorkspaceReducer } from "./RankingWorkspaceState";
@@ -105,11 +105,38 @@ const RankingWorkspace = React.memo(() => {
 				onClose={() => setComparisonEditorOpen(false)}
 				fullWidth
 				maxWidth="sm"
+				slotProps={{
+					paper: {
+						sx: (theme) => ({
+							height: "min(800px, calc(100% - 64px))",
+							overflow: "hidden",
+							[theme.breakpoints.down("sm")]: {
+								borderRadius: 0,
+								height: "100%",
+								margin: 0,
+								maxHeight: "none",
+								maxWidth: "none",
+								width: "100%",
+							},
+						}),
+					},
+				}}
 			>
 				<DialogTitle>
 					{t(comparisonIv ? "fork.scenario.comparison" : "pokemon")}
 				</DialogTitle>
-				<DialogContent>
+				<DialogContent
+					sx={
+						state.lowerTabIndex === 1
+							? {
+									display: "flex",
+									flexDirection: "column",
+									overflow: "hidden",
+									padding: 0,
+								}
+							: undefined
+					}
+				>
 					<LowerTabHeader
 						state={{ ...state, tabIndex: 0 }}
 						isBoxEmpty={state.box.items.length === 0}
@@ -126,7 +153,7 @@ const RankingWorkspace = React.memo(() => {
 							/>
 						</>
 					) : (
-						<BoxTabChild
+						<RankingComparisonBoxPanel
 							items={state.box.items}
 							iv={state.pokemonIv}
 							selectedId={state.selectedItemId}
