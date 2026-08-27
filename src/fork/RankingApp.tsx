@@ -84,7 +84,7 @@ function useMultilingual(config: AppConfig) {
 function useAppMetadata(language: string) {
 	const { t } = useTranslation();
 	useEffect(() => {
-		document.title = t(`${app}.title`);
+		document.title = t("fork.brand.browser title");
 		const manifest = document.querySelector<HTMLLinkElement>(
 			"link[rel='manifest']",
 		);
@@ -98,7 +98,7 @@ function useAppMetadata(language: string) {
 			"meta[name='description']",
 		);
 		if (description !== null) {
-			description.content = t(`${app}.description`);
+			description.content = t("fork.brand.subtitle");
 		}
 		const html = document.querySelector<HTMLHtmlElement>("html");
 		if (html !== null) {

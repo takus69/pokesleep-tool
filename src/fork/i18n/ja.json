@@ -1,5 +1,10 @@
 {
 	"fork": {
+		"brand": {
+			"screen title": "ポケモン性能ランキング",
+			"subtitle": "個体値計算機をベースにした、育成候補と手持ち個体の比較ツール",
+			"browser title": "ポケモン性能ランキング｜個体値計算機 for ポケモンスリープ"
+		},
 		"ingredientRanking": {
 			"ranking mode": "ランキングモード",
 			"trait ranking": "育成条件ランキング",

@@ -1,5 +1,10 @@
 {
 	"fork": {
+		"brand": {
+			"screen title": "포켓몬 성능 랭킹",
+			"subtitle": "개체값 계산기를 기반으로 육성 후보와 보유 포켓몬을 비교하는 도구",
+			"browser title": "포켓몬 성능 랭킹｜포켓몬 슬립 개체값 계산기"
+		},
 		"ingredientRanking": {
 			"ranking mode": "랭킹 모드",
 			"trait ranking": "육성 조건 랭킹",

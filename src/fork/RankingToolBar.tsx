@@ -41,7 +41,7 @@ export default function RankingToolBar({
 
 	return (
 		<StyledAppBar>
-			<div className="title">{t(`${app}.title`)}</div>
+			<div className="title">{t("fork.brand.screen title")}</div>
 			<IconButton
 				aria-label="actions"
 				color="inherit"

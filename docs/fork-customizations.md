@@ -25,8 +25,11 @@ Fork-specific presentation code lives in `src/fork/`:
   run-id protection, and result freshness.
 - `RankingEnvironmentForm.tsx` and `RankingEnvironmentDialog.tsx` adapt the
   existing strength-parameter controls without individual overrides.
-- `i18n/` contains namespaced `fork.scenario.*`, `fork.ingredientRanking.*`, and `fork.about.*`
-  translations, registered by `src/fork/i18n.ts`.
+- `i18n/` contains namespaced `fork.brand.*`, `fork.scenario.*`,
+  `fork.ingredientRanking.*`, and `fork.about.*` translations, registered by
+  `src/fork/i18n.ts`. The fork brand keys supply the toolbar title, introductory
+  subtitle, browser title, and metadata description without changing upstream
+  `IvCalc` translations.
 
 Fork-specific calculation logic lives in `src/util/RankingScenario.ts` with
 its co-located test. It reuses the existing ranking utilities for ingredient

@@ -141,6 +141,7 @@ export default function RankingScenarioView({
 		});
 	return (
 		<Stack gap={2} sx={{ p: 1 }}>
+			<Typography color="text.secondary">{t("fork.brand.subtitle")}</Typography>
 			<TextField
 				select
 				label={t(key("purpose"))}

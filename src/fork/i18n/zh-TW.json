@@ -1,5 +1,10 @@
 {
 	"fork": {
+		"brand": {
+			"screen title": "寶可夢性能排行榜",
+			"subtitle": "以個體值計算器為基礎，用於比較培育候選與持有寶可夢的工具",
+			"browser title": "寶可夢性能排行榜｜Pokémon Sleep 個體值計算器"
+		},
 		"ingredientRanking": {
 			"ranking mode": "排名模式",
 			"trait ranking": "培育條件排名",

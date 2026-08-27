@@ -89,6 +89,7 @@ function saveReadyScenario() {
 describe("unified scenario view", () => {
 	test("starts uncalculated with no Pokemon or comparison requirement and collapsed options", () => {
 		view();
+		expect(screen.getByText("fork.brand.subtitle")).toBeTruthy();
 		expect(calculateRankingScenarioAsync).not.toHaveBeenCalled();
 		expect(
 			(screen.getByRole("combobox", { name: "pokemon" }) as HTMLInputElement)

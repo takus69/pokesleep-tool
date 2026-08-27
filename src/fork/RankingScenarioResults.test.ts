@@ -219,12 +219,11 @@ describe("scenario comparison position", () => {
 	});
 
 	test("limits partial rows and restores 100-group paging for the final result", () => {
-		const candidate = entry("AAA", 10);
 		const groups = Array.from({ length: 125 }, (_, index) => ({
 			value: 125 - index,
-			entries: [candidate],
+			entries: [],
 		}));
-		const result = { entries: [candidate], groups, exclusions: [] };
+		const result = { entries: [], groups, exclusions: [] };
 		const props = {
 			result,
 			comparison: null,
@@ -243,19 +242,15 @@ describe("scenario comparison position", () => {
 				React.createElement(RankingScenarioResults, { ...props, isPartial }),
 			);
 		const { rerender } = render(view(true));
-		expect(
-			screen.getAllByRole("button", {
-				name: "fork.scenario.show conditions",
-			}),
-		).toHaveLength(partialRankingGroupLimit);
+		expect(screen.getAllByTestId("ranking-result-group")).toHaveLength(
+			partialRankingGroupLimit,
+		);
 		expect(screen.queryByRole("navigation")).toBeNull();
 
 		rerender(view(false));
-		expect(
-			screen.getAllByRole("button", {
-				name: "fork.scenario.show conditions",
-			}),
-		).toHaveLength(rankingPageSize);
+		expect(screen.getAllByTestId("ranking-result-group")).toHaveLength(
+			rankingPageSize,
+		);
 		expect(screen.getAllByRole("navigation")).toHaveLength(2);
 	});
 

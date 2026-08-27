@@ -309,7 +309,10 @@ function RankingScenarioResults({
 					{merged.page === currentPage &&
 						merged.groupIndex === start + offset &&
 						comparisonRow}
-					<Box sx={{ borderBottom: "1px solid", borderColor: "divider", p: 1 }}>
+					<Box
+						data-testid="ranking-result-group"
+						sx={{ borderBottom: "1px solid", borderColor: "divider", p: 1 }}
+					>
 						<Stack
 							direction="row"
 							alignItems="center"
