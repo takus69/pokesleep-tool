@@ -2,13 +2,11 @@
 
 Personal ranking-focused fork of [nitoyon/pokesleep-tool](https://github.com/nitoyon/pokesleep-tool).
 
-The hosted website has been retired. Please use the published Chrome or Edge extension for the ranking tool. This repository remains available as the source archive and for local development.
+Updates to this fork have stopped, and it is no longer maintained. The hosted website has been retired. Please use the published Chrome or Edge extension for the ranking tool. This repository remains available as the source archive and for local development.
 
 - [Chrome extension](https://chromewebstore.google.com/detail/mpipkmcenpcfekbpjlhepmflnbjhgpfh)
 - [Edge extension](https://microsoftedge.microsoft.com/addons/detail/fajkddnhbedmajmmnljclpjnfjopanhl)
 - [Upstream project](https://github.com/nitoyon/pokesleep-tool)
-
-Feel free to [contribute](CONTRIBUTING.md)!
 
 ## How to build
 
