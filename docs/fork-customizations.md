@@ -1,7 +1,9 @@
 # Fork customizations
 
-This fork publishes a ranking-focused application while continuing
+This fork retains the source of a ranking-focused application while continuing
 to use upstream Pokémon Sleep calculations, data, state, and shared UI.
+The hosted website has been retired in favor of the published Chrome and Edge
+extensions. The source remains available for local development.
 
 ## Boundary
 
@@ -44,9 +46,11 @@ Do not put ranking-only UI or translations back into `src/ui/` or
 `src/i18n/<language>/IvCalc.json`. Keeping those files identical to upstream
 reduces recurring merge conflicts.
 
-The upstream `.github/workflows/deploy.yml` is also kept unchanged. Fork
-publishing is defined separately in `.github/workflows/fork-deploy.yml` and
-runs only in `takus69/pokesleep-tool` on main pushes or manual dispatches.
+The upstream `.github/workflows/deploy.yml` is also kept unchanged. Its owner
+condition prevents deployment from this fork. The fork-specific deployment
+workflow has been removed, so main pushes and manual workflow dispatches no
+longer publish this fork's website. GitHub Pages has also been disabled in the
+repository settings to unpublish the existing site.
 
 `biome.json` has one intentional fork-only difference: local `.codex/` and
 `artifacts/` directories are excluded from repository verification. These are
